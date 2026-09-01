@@ -1,0 +1,107 @@
+/* Sales dashboard screen — layout specific to this page only. */
+
+.dashboard-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 13px;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-kpis {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dash-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px;
+  margin-top: 13px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .dash-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dash-card {
+  padding: 14px;
+}
+
+/* Bookings-by-week bar chart — plain flex/CSS, no chart library. */
+.dash-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 130px;
+  margin-top: 12px;
+}
+
+.dash-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+
+.dash-bar {
+  width: 100%;
+  max-width: 22px;
+  border-radius: 4px 4px 0 0;
+  background: var(--primary);
+  min-height: 3px;
+  transition: height 0.2s ease;
+}
+
+/* Pipeline-mix donut — conic-gradient, no chart library. */
+.dash-donut {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-donut-hole {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Funnel */
+.dash-funnel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-funnel-bar {
+  background: var(--brand-soft, var(--surface2));
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font: 600 11.5px var(--b);
+  color: var(--ink);
+  min-width: 60px;
+}
+
+[data-theme="dark"] .dash-funnel-bar {
+  background: var(--surface2);
+}

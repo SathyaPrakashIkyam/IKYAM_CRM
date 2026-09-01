@@ -1,0 +1,186 @@
+/* =====================================================================
+   Ikyam "mockup" design layer.
+   Everything here is scoped under the .ikyam-mock wrapper class so it can
+   NEVER change Onboarding / User management / company-admin screens or the
+   shared AppShell chrome (rail, topbar) — those keep using theme.css as-is.
+   Redefining the same custom-property names (--bg, --ink, --brand, --green…)
+   inside .ikyam-mock lets every component class already defined in
+   theme.css (.card, .btn, .chip, .frame, .kcol, .kcard, .tl, .qtable,
+   .tiles, .donut, .scorep …) automatically pick up the mockup's Ikyam
+   navy / arc palette, purely because those rules read var(--token).
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+.ikyam-mock {
+  --bg: #f3f4fa;
+  --surface: #ffffff;
+  --surface2: #f8f9fd;
+  --line: #e6e8f3;
+  --line2: #d5d8ea;
+  --ink: #181935;
+  --mut: #5c5f79;
+  --faint: #9598b3;
+
+  --brand: #02004f;
+  --primary: #2e2bbd;
+  --primary-ink: #fff;
+  --primary-soft: #ececfb;
+
+  --green: #00a24b;
+  --green-soft: #e2f5ea;
+  --green-ink: #0a7a3e;
+
+  --amber: #eda612;
+  --amber-soft: #fdf3da;
+  --amber-ink: #8f6407;
+
+  --orange: #e14a0e;
+  --orange-soft: #fdeae2;
+  --orange-ink: #b23a0b;
+
+  --glass: rgba(255, 255, 255, 0.72);
+  --shadow: 0 1px 2px rgba(15, 16, 60, 0.05), 0 4px 14px rgba(15, 16, 60, 0.05);
+  --shadow-lift: 0 8px 24px rgba(15, 16, 60, 0.12);
+  --arc: linear-gradient(120deg, #00b050, #f8b12a 55%, #e85112);
+
+  --d: 'Sora', -apple-system, 'Segoe UI', sans-serif;
+  --b: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+
+  color: var(--ink);
+  font-family: var(--b);
+}
+
+[data-theme='dark'] .ikyam-mock {
+  --bg: #0a0b20;
+  --surface: #14152f;
+  --surface2: #1a1b3a;
+  --line: rgba(255, 255, 255, 0.09);
+  --line2: rgba(255, 255, 255, 0.16);
+  --ink: #ecedfa;
+  --mut: #a6a9c8;
+  --faint: #6e7194;
+
+  --brand: #c9c8ff;
+  --primary: #8583ff;
+  --primary-ink: #0a0b20;
+  --primary-soft: rgba(133, 131, 255, 0.14);
+
+  --green: #2fd07c;
+  --green-soft: rgba(47, 208, 124, 0.13);
+  --green-ink: #5fe09b;
+
+  --amber: #ffc14d;
+  --amber-soft: rgba(255, 193, 77, 0.12);
+  --amber-ink: #ffcf75;
+
+  --orange: #ff7a45;
+  --orange-soft: rgba(255, 122, 69, 0.12);
+  --orange-ink: #ff9668;
+
+  --glass: rgba(20, 21, 47, 0.65);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow-lift: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --arc: linear-gradient(120deg, #2fd07c, #ffc14d 55%, #ff7a45);
+}
+
+/* ---- tighter, mockup-accurate shapes for shared theme.css components ---- */
+.ikyam-mock .frame,
+.ikyam-mock .card,
+.ikyam-mock .tile { border-radius: 14px; box-shadow: var(--shadow); }
+.ikyam-mock .card { padding: 13px 15px; }
+.ikyam-mock .btn { border-radius: 9px; padding: 7px 14px; box-shadow: none; }
+.ikyam-mock .btn:hover { box-shadow: var(--shadow); }
+.ikyam-mock .chip { border-radius: 20px; box-shadow: none; }
+.ikyam-mock .kcol { border-radius: 12px; }
+.ikyam-mock .kcard { border-radius: 10px; }
+.ikyam-mock .scr-head h2 { font: 600 16px var(--d); }
+.ikyam-mock .lab { font: 600 10.5px var(--b); letter-spacing: 0.7px; }
+.ikyam-mock b, .ikyam-mock strong { font-family: var(--d); }
+
+/* ===== AI signature surfaces — the segmented Ikyam arc frame ===== */
+.ikyam-mock .ai-frame {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--arc) border-box;
+  box-shadow: var(--shadow);
+}
+.ikyam-mock .ai-tag {
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  font: 600 9.5px var(--b);
+  letter-spacing: 0.8px;
+  background: var(--arc);
+  color: #fff;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+/* ===== segmented probability ring ===== */
+.ikyam-mock .ring {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  flex: none;
+  background: conic-gradient(from -90deg, var(--green) 0 32%, transparent 32% 34%, var(--amber) 34% 66%, transparent 66% 68%, var(--line) 68% 98%, transparent 98% 100%);
+}
+.ikyam-mock .ring::after { content: ''; position: absolute; inset: 9px; border-radius: 50%; background: var(--surface); }
+.ikyam-mock .ring b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 19px var(--d); z-index: 1; }
+.ikyam-mock .ring span { position: absolute; left: 0; right: 0; bottom: 16px; text-align: center; font-size: 9.5px; color: var(--faint); z-index: 1; }
+
+/* ===== segmented stage bar (record page) ===== */
+.ikyam-mock .segbar { display: flex; gap: 5px; margin-top: 10px; }
+.ikyam-mock .seg { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+.ikyam-mock .seg.done { background: var(--brand); }
+[data-theme='dark'] .ikyam-mock .seg.done { background: var(--primary); }
+.ikyam-mock .seg.cur { background: var(--arc); }
+.ikyam-mock .seglabs { display: flex; margin-top: 5px; }
+.ikyam-mock .seglabs span { flex: 1; font-size: 10.5px; color: var(--faint); }
+.ikyam-mock .seglabs .cur { color: var(--ink); font-weight: 600; }
+
+/* ===== activity-type chips ===== */
+.ikyam-mock .actchip { cursor: pointer; }
+.ikyam-mock .actchip.on { background: var(--primary-soft); border-color: transparent; color: var(--brand); }
+[data-theme='dark'] .ikyam-mock .actchip.on { color: var(--primary); }
+
+/* ===== inline confirmation panel (e.g. lead convert) ===== */
+.ikyam-mock .modal {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface2);
+  box-shadow: var(--shadow);
+  padding: 17px;
+}
+
+/* ===== sync conflict compare boxes ===== */
+.ikyam-mock .conf { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-top: 10px; }
+.ikyam-mock .confbox { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; background: var(--surface2); }
+
+/* ===== avatars ===== */
+.ikyam-mock .av { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font: 600 10.5px var(--b); color: #fff; flex: none; }
+.ikyam-mock .av.a { background: #3f3c9e; }
+.ikyam-mock .av.b { background: #0a8a4a; }
+.ikyam-mock .av.c { background: #c9560f; }
+
+/* ===== executive overview: pipeline health strip ===== */
+.ikyam-mock .stagestrip { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-top: 8px; }
+.ikyam-mock .stagestrip span { display: flex; align-items: center; justify-content: center; font: 600 10px var(--b); color: #fff; }
+.ikyam-mock .legend { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+.ikyam-mock .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+/* ===== risk / attention rows ===== */
+.ikyam-mock .riskrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.ikyam-mock .riskrow:last-child { border-bottom: 0; }
+
+/* ===== hero KPI cards with a small trend chip ===== */
+.ikyam-mock .herokpi { position: relative; overflow: hidden; }
+.ikyam-mock .herokpi .delta { display: inline-flex; align-items: center; gap: 3px; font: 600 11px var(--b); margin-top: 4px; }
+.ikyam-mock .up { color: var(--green-ink); }
+.ikyam-mock .dn { color: var(--orange-ink); }
+
+@media (max-width: 940px) {
+  .ikyam-mock .kcols, .ikyam-mock .kpis, .ikyam-mock .tiles { grid-template-columns: repeat(2, 1fr); }
+  .ikyam-mock .rec, .ikyam-mock .split { grid-template-columns: 1fr; }
+}

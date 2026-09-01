@@ -1,0 +1,33 @@
+/* SAP sync monitor screen — layout specific to this page only. */
+
+.sync-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-right: 8px;
+  box-shadow: 0 0 0 0 var(--green);
+  animation: sync-pulse 2s infinite;
+}
+
+@keyframes sync-pulse {
+  70% { box-shadow: 0 0 0 7px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-pulse { animation: none; }
+}
+
+.sync-payload {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  font: 500 11px var(--m);
+  color: var(--ink);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

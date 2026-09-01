@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { accountsApi } from '../api/endpoints'
 import { currentCompanyId } from '../api/client'
+import '../styles/ikyam-mock.css'
+import './Accounts.css'
 
 export default function Accounts() {
   const [accounts, setAccounts] = useState([])
@@ -41,81 +43,103 @@ export default function Accounts() {
     setShowNew(false)
   }
 
+  const openValue = related.opportunities
+    .filter((o) => o.status === 'open')
+    .reduce((sum, o) => sum + (o.amount || 0), 0)
+
   return (
     <AppShell>
-      <div className="scr-head"><h2>Accounts</h2><span className="goal">Every company you sell to.</span></div>
-      <div className="frame">
-        <div className="split">
-          <div className="lst">
-            <div className="rowx sp" style={{ padding: '12px 15px', borderBottom: '1px solid var(--line)' }}>
-              <b style={{ font: '600 13px var(--d)' }}>Accounts · {accounts.length}</b>
-              <button className="btn pri" style={{ padding: '4px 9px' }} onClick={() => setShowNew((v) => !v)}>＋ New account</button>
+      <div className="ikyam-mock accounts-page">
+        <div className="scr-head"><h2>Accounts</h2><span className="goal">Every company you sell to.</span></div>
+        <div className="frame">
+          <div className="split">
+            <div className="lst">
+              <div className="rowx sp" style={{ padding: '12px 15px', borderBottom: '1px solid var(--line)' }}>
+                <b style={{ font: '600 13px var(--d)' }}>Accounts · {accounts.length}</b>
+                <button className="btn pri" style={{ padding: '4px 9px' }} onClick={() => setShowNew((v) => !v)}>＋ New account</button>
+              </div>
+              {showNew && (
+                <div className="card" style={{ margin: '10px 12px', padding: 11 }}>
+                  <form onSubmit={createAccount}>
+                    <input required placeholder="Company name" value={newAccount.name}
+                      onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })} style={fieldInput} />
+                    <input placeholder="Industry" value={newAccount.industry}
+                      onChange={(e) => setNewAccount({ ...newAccount, industry: e.target.value })} style={{ ...fieldInput, marginTop: 6 }} />
+                    <div className="rowx sp" style={{ marginTop: 8 }}>
+                      <button type="button" className="btn ghost" style={{ padding: '4px 9px' }} onClick={() => setShowNew(false)}>Cancel</button>
+                      <button className="btn pri" style={{ padding: '4px 9px' }}>Create account</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+              {accounts.map((a) => (
+                <div key={a.id} className={`lead ${selected?.id === a.id ? 'sel' : ''}`} style={{ cursor: 'pointer' }} onClick={() => select(a)}>
+                  <div className="rowx sp">
+                    <div className="rowx">
+                      <span className="av a">{a.name.slice(0, 2).toUpperCase()}</span>
+                      <div><b>{a.name}</b><div className="tiny">{a.industry || a.account_type}</div></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            {showNew && (
-              <div className="card" style={{ margin: '10px 12px', padding: 11 }}>
-                <form onSubmit={createAccount}>
-                  <input required placeholder="Company name" value={newAccount.name}
-                    onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })} style={fieldInput} />
-                  <input placeholder="Industry" value={newAccount.industry}
-                    onChange={(e) => setNewAccount({ ...newAccount, industry: e.target.value })} style={{ ...fieldInput, marginTop: 6 }} />
-                  <div className="rowx sp" style={{ marginTop: 8 }}>
-                    <button type="button" className="btn ghost" style={{ padding: '4px 9px' }} onClick={() => setShowNew(false)}>Cancel</button>
-                    <button className="btn pri" style={{ padding: '4px 9px' }}>Create account</button>
-                  </div>
-                </form>
-              </div>
-            )}
-            {accounts.map((a) => (
-              <div key={a.id} className={`lead ${selected?.id === a.id ? 'sel' : ''}`} style={{ cursor: 'pointer' }} onClick={() => select(a)}>
-                <div className="rowx sp">
-                  <div className="rowx">
-                    <span className="av a">{a.name.slice(0, 2).toUpperCase()}</span>
-                    <div><b>{a.name}</b><div className="tiny">{a.industry || a.account_type}</div></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
 
-          <div style={{ padding: 18 }}>
-            {selected ? (
-              <>
-                <b style={{ font: '600 15px var(--d)' }}>{selected.name}</b>
-                <div className="tiny">{selected.account_no} · {selected.industry || selected.account_type}</div>
+            <div style={{ padding: 18 }}>
+              {selected ? (
+                <>
+                  <div className="rowx sp" style={{ flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <b style={{ font: '600 15px var(--d)' }}>{selected.name}</b>
+                      <div className="tiny">{selected.account_no} · {selected.industry || selected.account_type}</div>
+                    </div>
+                    <button className="btn pri" onClick={() => navigate('/pipeline')}>＋ New opportunity</button>
+                  </div>
 
-                <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', marginTop: 16 }}>
-                  <div>
-                    <div className="lab">Contacts ({related.contacts.length})</div>
-                    {related.contacts.map((c) => (
-                      <div className="card hov" key={c.id} style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }} onClick={() => navigate('/contacts')}>
-                        <b style={{ fontSize: 12 }}>{c.first_name} {c.last_name}</b>
-                        <div className="tiny">{c.title || '—'}</div>
-                      </div>
-                    ))}
+                  <div className="ai-frame" style={{ padding: 12, marginTop: 13 }}>
+                    <span className="ai-tag">ACCOUNT SNAPSHOT</span>
+                    <div className="tiny" style={{ marginTop: 3 }}>
+                      ₹{openValue.toLocaleString('en-IN')} open across {related.opportunities.filter((o) => o.status === 'open').length} opportunit{related.opportunities.filter((o) => o.status === 'open').length === 1 ? 'y' : 'ies'} ·{' '}
+                      {related.quotes.length} quote{related.quotes.length === 1 ? '' : 's'} on file · {related.contacts.length} contact{related.contacts.length === 1 ? '' : 's'} known.
+                    </div>
                   </div>
-                  <div>
-                    <div className="lab">Opportunities ({related.opportunities.length})</div>
-                    {related.opportunities.map((o) => (
-                      <div className="card hov" key={o.id} style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }} onClick={() => navigate(`/record/${o.id}`)}>
-                        <b style={{ fontSize: 12 }}>{o.name}</b>
-                        <div className="tiny">{o.amount ? `₹${o.amount.toLocaleString('en-IN')}` : '—'} · {o.status}</div>
-                      </div>
-                    ))}
+
+                  <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', marginTop: 13 }}>
+                    <div>
+                      <div className="lab">Contacts ({related.contacts.length})</div>
+                      {related.contacts.map((c) => (
+                        <div className="card hov" key={c.id} style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }} onClick={() => navigate('/contacts')}>
+                          <b style={{ fontSize: 12 }}>{c.first_name} {c.last_name}</b>
+                          <div className="tiny">{c.title || '—'}</div>
+                        </div>
+                      ))}
+                      {related.contacts.length === 0 && <div className="tiny" style={{ marginTop: 6 }}>None yet.</div>}
+                    </div>
+                    <div>
+                      <div className="lab">Opportunities ({related.opportunities.length})</div>
+                      {related.opportunities.map((o) => (
+                        <div className="card hov" key={o.id} style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }} onClick={() => navigate(`/record/${o.id}`)}>
+                          <b style={{ fontSize: 12 }}>{o.name}</b>
+                          <div className="tiny">{o.amount ? `₹${o.amount.toLocaleString('en-IN')}` : '—'} · {o.status}</div>
+                        </div>
+                      ))}
+                      {related.opportunities.length === 0 && <div className="tiny" style={{ marginTop: 6 }}>None yet.</div>}
+                    </div>
+                    <div>
+                      <div className="lab">Quotes ({related.quotes.length})</div>
+                      {related.quotes.map((q) => (
+                        <div className="card hov" key={q.id} style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }} onClick={() => navigate('/quotes')}>
+                          <b style={{ fontSize: 12 }}>{q.doc_num}</b>
+                          <div className="tiny">₹{q.total.toLocaleString('en-IN')} · {q.status}</div>
+                        </div>
+                      ))}
+                      {related.quotes.length === 0 && <div className="tiny" style={{ marginTop: 6 }}>None yet.</div>}
+                    </div>
                   </div>
-                  <div>
-                    <div className="lab">Quotes ({related.quotes.length})</div>
-                    {related.quotes.map((q) => (
-                      <div className="card hov" key={q.id} style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }} onClick={() => navigate('/quotes')}>
-                        <b style={{ fontSize: 12 }}>{q.doc_num}</b>
-                        <div className="tiny">₹{q.total.toLocaleString('en-IN')} · {q.status}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="tiny">Select an account, or create one.</div>
-            )}
+                </>
+              ) : (
+                <div className="tiny">Select an account, or create one.</div>
+              )}
+            </div>
           </div>
         </div>
       </div>

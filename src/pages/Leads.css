@@ -1,0 +1,23 @@
+/* Lead inbox & conversion screen — layout specific to this page only. */
+
+.leads-page .split {
+  grid-template-columns: 340px 1fr;
+}
+
+.leads-page .lst {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.leads-detail-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 940px) {
+  .leads-page .split {
+    grid-template-columns: 1fr;
+  }
+  .leads-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

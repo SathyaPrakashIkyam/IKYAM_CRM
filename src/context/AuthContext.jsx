@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { authApi, companiesApi } from '../api/endpoints'
+import { authApi, companiesApi, rolesApi } from '../api/endpoints'
 import { clearAuth, currentCompanyId, setCurrentCompanyId, storeAuth } from '../api/client'
 
 const AuthContext = createContext(null)
@@ -13,24 +13,56 @@ export function AuthProvider({ children }) {
   const [companyId, setCompanyId] = useState(currentCompanyId())
   const [loading, setLoading] = useState(true)
 
+  // Real Role Management permissions for the signed-in user — drives both
+  // which nav tabs render (UI) and backs every gated route (server already
+  // enforces this independently; this just keeps the UI from dangling a
+  // link to something that would 403 anyway).
+  const [permissions, setPermissions] = useState({})
+  const [permBypass, setPermBypass] = useState(false)
+  const [permLoaded, setPermLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!auth) {
+      setPermissions({})
+      setPermBypass(false)
+      setPermLoaded(false)
+      return
+    }
+    rolesApi.myPermissions()
+      .then((res) => {
+        setPermBypass(!!res.bypass)
+        setPermissions(res.permissions || {})
+      })
+      .catch(() => {
+        setPermissions({})
+        setPermBypass(false)
+      })
+      .finally(() => setPermLoaded(true))
+  }, [auth])
+
+  function can(moduleCode, action = 'view') {
+    if (permBypass) return true
+    return !!(permissions[moduleCode] && permissions[moduleCode][action])
+  }
+
   useEffect(() => {
     if (!auth) {
       setLoading(false)
       return
     }
-    companiesApi
-      .list()
-      .then((list) => {
-        setCompanies(list)
-        if (!companyId && list.length > 0) {
-          setCurrentCompanyId(list[0].id)
-          setCompanyId(list[0].id)
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+     // In this architecture, a standard user belongs to a specific schema (company_id)
+    const activeId = auth.schema_id || auth.tenant_uuid;
+    if (activeId) {
+      setCompanies([{ id: activeId, name: auth.schema_id || activeId }])
+      if (!companyId) {
+        setCurrentCompanyId(activeId)
+        setCompanyId(activeId)
+      }
+    }
+   
+    setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth])
+  }, [auth, companyId])
 
   function login(tokens) {
     storeAuth(tokens)
@@ -49,9 +81,39 @@ export function AuthProvider({ children }) {
     setCompanyId(id)
   }
 
+  const user = auth
+    ? (auth.user || {
+        full_name: auth.user_name || auth.email || 'User',
+        email: auth.email,
+        role: auth.role,
+        user_id: auth.user_id,
+        global_user_id: auth.global_user_id,
+      })
+    : null
+
+  const role = auth?.role || user?.role || ''
+  const isSuperAdmin = role.toUpperCase() === 'SUPER_ADMIN' || role.toUpperCase() === 'SUPER ADMIN'
+  const isCompanyAdmin = role.toUpperCase() === 'COMPANY_ADMIN' || role.toUpperCase() === 'COMPANY ADMIN'
+
   return (
     <AuthContext.Provider
-      value={{ auth, user: auth?.user, tenant: auth?.tenant, companies, companyId, switchCompany, login, logout, loading }}
+      value={{
+        auth,
+        user,
+        role,
+        isSuperAdmin,
+        isCompanyAdmin,
+        tenant: auth?.tenant,
+        companies,
+        companyId,
+        switchCompany,
+        login,
+        logout,
+        loading,
+        can,
+        permBypass,
+        permLoaded,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,0 +1,46 @@
+/* Executive overview screen — layout specific to this page only. */
+
+.exec-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 13px;
+  margin-top: 16px;
+}
+
+.exec-cols {
+  grid-template-columns: 1.6fr 1fr;
+  margin-top: 16px;
+  align-items: start;
+}
+
+.exec-badge {
+  width: 96px;
+  height: 96px;
+  margin: 14px auto 6px;
+  border-radius: 50%;
+  border: 1px solid var(--line2);
+  background: var(--surface2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.exec-badge b {
+  font: 600 22px var(--d);
+}
+
+.exec-badge span {
+  font-size: 10px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+@media (max-width: 940px) {
+  .exec-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .exec-cols {
+    grid-template-columns: 1fr;
+  }
+}

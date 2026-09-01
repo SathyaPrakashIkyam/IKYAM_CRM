@@ -1,258 +1,620 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { authApi } from '../api/endpoints'
-import { setCurrentCompanyId } from '../api/client'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { onboardingApi } from '../api/endpoints'
 import { useAuth } from '../context/AuthContext'
-import { IKYAM_LOGO } from '../assets/logo'
+import AppShell from '../components/AppShell'
+import '../styles/ikyam-mock.css'
 import '../styles/onboarding.css'
 
 export default function Onboarding() {
-  const [step, setStep] = useState(1)
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
+  const { auth, isSuperAdmin } = useAuth()
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const location = useLocation()
 
-  const [workspace, setWorkspace] = useState({
-    workspace_name: '', subdomain: '', region: 'in-1',
-    admin_full_name: '', admin_email: '', admin_password: '',
-  })
-  const [company, setCompany] = useState({
-    code: '', name: '', base_currency: 'INR', country: 'IN', fiscal_year_start: 4, erp_company_db: '',
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const [form, setForm] = useState({
+    onboard_company_id: '',
+    company_name: '',
+    company_phone_no: '',
+    company_street: '',
+    company_city: '',
+    company_state: '',
+    company_zipcode: '',
+    company_website: '',
+    industry_type: '',
+    headoffice_location: '',
+    company_gst: '',
+    registration_number: '',
+    company_logo: '',
+    user_name: '',
+    email: '',
+    user_phone_no: '',
+    email_id: '',
+    email_pwd: '',
+    smtp_server: '',
+    smtp_port: '',
+    source: '', // no default — the admin must actively pick Standalone or SAP B1
+    base_url: '',
+    sap_username: '',
+    sap_password: '',
+    sap_db: '',
+    db_type: '',
+    schema_id: '',
+    is_active: false,
+    is_approved: false,
+    created_by: auth?.email || auth?.user_name || 'Admin',
+    updated_by: auth?.email || auth?.user_name || 'Admin',
   })
 
-  async function submitWorkspace(e) {
+  useEffect(() => {
+    if (location.state?.record) {
+      const rec = location.state.record
+      setForm((prev) => ({
+        ...prev,
+        ...rec,
+        onboard_company_id: rec.onboard_company_id || rec.id || '',
+        company_name: rec.company_name || '',
+        company_phone_no: rec.company_phone_no || '',
+        company_street: rec.company_street || '',
+        company_city: rec.company_city || '',
+        company_state: rec.company_state || '',
+        company_zipcode: rec.company_zipcode || '',
+        company_website: rec.company_website || '',
+        industry_type: rec.industry_type || '',
+        headoffice_location: rec.headoffice_location || '',
+        company_gst: rec.company_gst || '',
+        registration_number: rec.registration_number || '',
+        company_logo: rec.company_logo || '',
+        user_name: rec.user_name || '',
+        email: rec.email || '',
+        user_phone_no: rec.user_phone_no || '',
+        email_id: rec.email_id || '',
+        email_pwd: rec.email_pwd || '',
+        smtp_server: rec.smtp_server || '',
+        smtp_port: rec.smtp_port || '',
+        base_url: rec.base_url || '',
+        sap_username: rec.sap_username || '',
+        sap_password: rec.sap_password || '',
+        sap_db: rec.sap_db || '',
+        db_type: rec.db_type || '',
+        source: rec.source || 'standalone',
+        schema_id: rec.schema_id || '',
+        is_active: rec.is_active ?? false,
+        is_approved: rec.is_approved ?? false,
+      }))
+    }
+  }, [location.state])
+
+  const [logoFile, setLogoFile] = useState(null)
+  const [logoPreview, setLogoPreview] = useState('')
+  const [showSapPw, setShowSapPw] = useState(false)
+  const [showSmtpPw, setShowSmtpPw] = useState(false)
+
+  function handleLogoChange(e) {
+    const file = e.target.files[0]
+    if (file) {
+      setLogoFile(file)
+      setLogoPreview(URL.createObjectURL(file))
+    }
+  }
+
+  const isEditMode = Boolean(form.onboard_company_id)
+  const needsSapConfig = form.source === 'sap_b1'
+
+  async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    setSuccess('')
+
+    if (!form.source) {
+      setError('Please choose the company\'s Source (Standalone or SAP B1) in section 3 before submitting.')
+      return
+    }
+
     setSaving(true)
     try {
-      const tokens = await authApi.createWorkspace(workspace)
-      login(tokens)
-      setStep(2)
+      let onboardingId = form.onboard_company_id
+      if (isEditMode && onboardingId) {
+        await onboardingApi.updateCompanyDetails(onboardingId, form)
+      } else {
+        const res = await onboardingApi.addCompanyDetails(form)
+        onboardingId = res?.onboard_company_id || res?.data?.onboard_company_id || res?.id || onboardingId
+      }
+
+      if (logoFile && onboardingId) {
+        const formData = new FormData()
+        formData.append('file', logoFile)
+        try {
+          await onboardingApi.addOnboardingLogo(onboardingId, formData)
+        } catch (logoErr) {
+          console.error('Failed to upload company logo:', logoErr)
+        }
+      }
+
+      setSuccess(
+        isEditMode
+          ? 'Onboarding details & logo updated successfully!'
+          : 'Onboarding company details & logo submitted successfully!'
+      )
+      setTimeout(() => {
+        if (isSuperAdmin) {
+          navigate('/onboarding-list')
+        } else {
+          navigate('/login')
+        }
+      }, 1500)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not create the workspace')
+      console.error('Failed to submit onboarding:', err)
+      const detail = err.response?.data?.detail
+      const errMsg =
+        typeof detail === 'string'
+          ? detail
+          : detail?.message || err.response?.data?.message || 'Could not save company onboarding details'
+      setError(errMsg)
     } finally {
       setSaving(false)
     }
   }
 
-  async function submitCompany(e) {
-    e.preventDefault()
-    setError('')
-    setSaving(true)
-    try {
-      const created = await authApi.createCompany(company)
-      setCurrentCompanyId(created.id)
-      navigate('/users')
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Could not create the company')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="onboarding-page">
-      {/* Background Glow Mesh */}
-      <div className="onboarding-bg-glow">
-        <div className="onboarding-glow-1" />
-        <div className="onboarding-glow-2" />
-        <div className="onboarding-grid-pattern" />
-      </div>
-
-      {/* Main Container */}
-      <div className="onboarding-card-container">
-        {/* Left Hero Panel */}
-        <div className="onboarding-hero-panel">
-          <div className="onboarding-hero-header">
-            <img src={IKYAM_LOGO} alt="Ikyam CRM" style={{ height: 26 }} />
-            <span className="onboarding-brand-tag">⚡ Quick Workspace Setup</span>
-          </div>
-
-          <div className="onboarding-hero-body">
-            <h1 className="onboarding-hero-title">
-              Welcome to <span className="gradient-text">Ikyam CRM</span>
-            </h1>
-            <p className="onboarding-hero-desc">
-              Set up your organization, admin credentials, and company structure in under 2 minutes.
+  const formContent = (
+    <div className="ikyam-mock onboarding-card-container full-width">
+      <div className="onboarding-form-panel">
+        <div className="onboarding-form-header rowx sp">
+          <div>
+            <h2>
+              {isEditMode
+                ? `Edit Onboarding: ${form.company_name || form.onboard_company_id}`
+                : 'Tenant & Company Onboarding'}
+            </h2>
+            <p>
+              {isEditMode
+                ? `Modify company, address, credentials, SAP integration & status for ${form.onboard_company_id}`
+                : 'Register company details, office location, admin credentials, and SAP B1 database integration.'}
             </p>
-
-            <div className="onboarding-steps-list">
-              <div className={`onboarding-step-item ${step === 1 ? 'active' : 'completed'}`}>
-                <div className="onboarding-step-badge">{step > 1 ? '✓' : '1'}</div>
-                <div className="onboarding-step-info">
-                  <h4>Workspace &amp; Admin Setup</h4>
-                  <p>Configure your workspace subdomain and primary admin account.</p>
-                </div>
-              </div>
-
-              <div className={`onboarding-step-item ${step === 2 ? 'active' : ''}`}>
-                <div className="onboarding-step-badge">2</div>
-                <div className="onboarding-step-info">
-                  <h4>Company &amp; ERP Profile</h4>
-                  <p>Define your primary entity code, currency, and ERP database link.</p>
-                </div>
-              </div>
-            </div>
           </div>
-
-          <div className="onboarding-hero-footer">
-            <span className="login-status-dot" />
-            <span>Multi-company &amp; SAP B1 ready</span>
-          </div>
+          {isEditMode && (
+            <span className="chip brand" style={{ fontSize: 13, padding: '4px 12px' }}>
+              Editing #{form.onboard_company_id}
+            </span>
+          )}
         </div>
 
-        {/* Right Form Panel */}
-        <div className="onboarding-form-panel">
-          {/* Progress Step Header */}
-          <div className="onboarding-progress-bar">
-            <div className={`onboarding-pill-step ${step === 1 ? 'active' : 'completed'}`}>
-              <span className="onboarding-pip-num">{step > 1 ? '✓' : '1'}</span>
-              <span>Workspace</span>
+        {error && (
+          <div className="onboarding-error-banner" style={{ marginBottom: 16 }}>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {success && (
+          <div className="chip ok" style={{ display: 'block', padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>
+            ✓ {success}
+          </div>
+        )}
+
+        <form className="onboarding-form" onSubmit={handleSubmit}>
+          {/* SECTION 1: COMPANY PROFILE */}
+          <div className="onboarding-section-card">
+            <div className="onboarding-section-title">🏢 1. Company Profile</div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">Company Name *</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    required
+                    type="text"
+                    className="onboarding-input"
+                    value={form.company_name}
+                    onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+                    placeholder="Würfel Küche Pvt. Ltd."
+                  />
+                </div>
+              </div>
+
+              <div className="onboarding-field">
+                <label className="onboarding-label">Company Phone No *</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    required
+                    type="text"
+                    maxLength={10}
+                    className="onboarding-input"
+                    value={form.company_phone_no}
+                    onChange={(e) =>
+                      setForm({ ...form, company_phone_no: e.target.value.replace(/\D/g, '').slice(0, 10) })
+                    }
+                    placeholder="9876543210"
+                  />
+                </div>
+              </div>
             </div>
-            <div className={`onboarding-step-divider ${step > 1 ? 'active' : ''}`} />
-            <div className={`onboarding-pill-step ${step === 2 ? 'active' : ''}`}>
-              <span className="onboarding-pip-num">2</span>
-              <span>Company details</span>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">Industry Type</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    type="text"
+                    className="onboarding-input"
+                    value={form.industry_type}
+                    onChange={(e) => setForm({ ...form, industry_type: e.target.value })}
+                    placeholder="IT / Manufacturing / Retail"
+                  />
+                </div>
+              </div>
+
+              <div className="onboarding-field">
+                <label className="onboarding-label">Company Website</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    type="text"
+                    className="onboarding-input"
+                    value={form.company_website}
+                    onChange={(e) => setForm({ ...form, company_website: e.target.value })}
+                    placeholder="https://company.com"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">GST Number</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    type="text"
+                    className="onboarding-input"
+                    value={form.company_gst}
+                    onChange={(e) => setForm({ ...form, company_gst: e.target.value })}
+                    placeholder="29AAAAA0000A1Z5"
+                  />
+                </div>
+              </div>
+
+              <div className="onboarding-field">
+                <label className="onboarding-label">Registration Number</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    type="text"
+                    className="onboarding-input"
+                    value={form.registration_number}
+                    onChange={(e) => setForm({ ...form, registration_number: e.target.value })}
+                    placeholder="REG-1092837"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">Company Logo</label>
+                <div className="onboarding-input-wrapper" style={{ padding: '6px 12px', height: 44, display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    style={{ fontSize: 12.5, width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              {(logoPreview || form.company_logo) ? (
+                <div className="onboarding-field">
+                  <label className="onboarding-label">Logo Preview</label>
+                  <div className="rowx" style={{ gap: 10, alignItems: 'center' }}>
+                    <img
+                      src={logoPreview || form.company_logo}
+                      alt="Company Logo"
+                      style={{ height: 40, maxWidth: 120, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)', background: '#fff', padding: 2 }}
+                    />
+                    <span className="tiny mut">Image ready</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="onboarding-field">
+                  <label className="onboarding-label">Logo Status</label>
+                  <span className="tiny mut" style={{ paddingTop: 10, display: 'block' }}>No logo file selected</span>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="onboarding-form-header">
-            <h2>{step === 1 ? 'Create your workspace' : 'Setup company profile'}</h2>
-            <p>{step === 1 ? 'Enter your workspace name and admin details' : 'Configure your primary operating business entity'}</p>
+          {/* SECTION 2: LOCATION & ADDRESS */}
+          <div className="onboarding-section-card" style={{ marginTop: 20 }}>
+            <div className="onboarding-section-title">📍 2. Location &amp; Address</div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">Street Address *</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    required
+                    type="text"
+                    className="onboarding-input"
+                    value={form.company_street}
+                    onChange={(e) => setForm({ ...form, company_street: e.target.value })}
+                    placeholder="123 Industrial Park Road"
+                  />
+                </div>
+              </div>
+
+              <div className="onboarding-field">
+                <label className="onboarding-label">Head Office Location</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    type="text"
+                    className="onboarding-input"
+                    value={form.headoffice_location}
+                    onChange={(e) => setForm({ ...form, headoffice_location: e.target.value })}
+                    placeholder="HQ Campus"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">City *</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    required
+                    type="text"
+                    className="onboarding-input"
+                    value={form.company_city}
+                    onChange={(e) => setForm({ ...form, company_city: e.target.value })}
+                    placeholder="Bengaluru"
+                  />
+                </div>
+              </div>
+
+              <div className="onboarding-field">
+                <label className="onboarding-label">State *</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    required
+                    type="text"
+                    className="onboarding-input"
+                    value={form.company_state}
+                    onChange={(e) => setForm({ ...form, company_state: e.target.value })}
+                    placeholder="Karnataka"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">Zipcode *</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    required
+                    type="text"
+                    className="onboarding-input"
+                    value={form.company_zipcode}
+                    onChange={(e) => setForm({ ...form, company_zipcode: e.target.value })}
+                    placeholder="560001"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
-          {error && (
-            <div className="onboarding-error-banner">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>{error}</span>
+          {/* SECTION 3: ADMIN & SAP B1 INTEGRATION */}
+          <div className="onboarding-section-card" style={{ marginTop: 20 }}>
+            <div className="onboarding-section-title">👤 3. Admin Credentials &amp; SAP B1 Config</div>
+
+            <div className="onboarding-field" style={{ marginBottom: 18 }}>
+              <label className="onboarding-label">Source</label>
+              <div className="onboarding-source-toggle">
+                <button
+                  type="button"
+                  className={form.source === 'standalone' ? 'active' : ''}
+                  onClick={() => setForm({ ...form, source: 'standalone' })}
+                >
+                  Standalone
+                </button>
+                <button
+                  type="button"
+                  className={form.source === 'sap_b1' ? 'active' : ''}
+                  onClick={() => setForm({ ...form, source: 'sap_b1' })}
+                >
+                  SAP B1
+                </button>
+              </div>
+              <div className="onboarding-hint" style={!form.source ? { color: 'var(--orange-ink)' } : undefined}>
+                {form.source === 'sap_b1'
+                  ? 'This company is SAP B1-integrated — every quote it creates is automatically queued for ERP sync.'
+                  : form.source === 'standalone'
+                  ? 'This company is CRM-only — quotes stay standalone, no SAP connection needed.'
+                  : 'Required — pick how this company will use the CRM before continuing.'}
+              </div>
             </div>
-          )}
 
-          {step === 1 && (
-            <form className="onboarding-form" onSubmit={submitWorkspace}>
-              <div className="onboarding-form-section-title">Workspace Configuration</div>
-              
+            <div className="onboarding-grid-2">
               <div className="onboarding-field">
-                <label className="onboarding-label">Workspace Name</label>
+                <label className="onboarding-label">Admin User Name</label>
                 <div className="onboarding-input-wrapper">
-                  <span className="onboarding-input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                    </svg>
-                  </span>
                   <input
-                    required
                     type="text"
                     className="onboarding-input"
-                    value={workspace.workspace_name}
-                    onChange={(e) => setWorkspace({ ...workspace, workspace_name: e.target.value })}
-                    placeholder="e.g. Würfel Küche Group"
+                    value={form.user_name}
+                    onChange={(e) => setForm({ ...form, user_name: e.target.value })}
+                    placeholder="Super Admin"
                   />
                 </div>
               </div>
 
               <div className="onboarding-field">
-                <label className="onboarding-label">Subdomain</label>
+                <label className="onboarding-label">Admin Email</label>
                 <div className="onboarding-input-wrapper">
-                  <span className="onboarding-input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="2" y1="12" x2="22" y2="12" />
-                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                    </svg>
-                  </span>
                   <input
-                    required
-                    pattern="[a-z0-9-]{3,40}"
-                    type="text"
-                    className="onboarding-input"
-                    value={workspace.subdomain}
-                    onChange={(e) => setWorkspace({ ...workspace, subdomain: e.target.value.toLowerCase() })}
-                    placeholder="wurfel"
-                  />
-                </div>
-              </div>
-
-              <div className="onboarding-form-section-title" style={{ marginTop: 8 }}>Primary Admin Account</div>
-
-              <div className="onboarding-field">
-                <label className="onboarding-label">Full Name</label>
-                <div className="onboarding-input-wrapper">
-                  <span className="onboarding-input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  </span>
-                  <input
-                    required
-                    type="text"
-                    className="onboarding-input"
-                    value={workspace.admin_full_name}
-                    onChange={(e) => setWorkspace({ ...workspace, admin_full_name: e.target.value })}
-                    placeholder="e.g. Prem A."
-                  />
-                </div>
-              </div>
-
-              <div className="onboarding-field">
-                <label className="onboarding-label">Work Email</label>
-                <div className="onboarding-input-wrapper">
-                  <span className="onboarding-input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                      <polyline points="22,6 12,13 2,6" />
-                    </svg>
-                  </span>
-                  <input
-                    required
                     type="email"
                     className="onboarding-input"
-                    value={workspace.admin_email}
-                    onChange={(e) => setWorkspace({ ...workspace, admin_email: e.target.value })}
-                    placeholder="prem@wurfelkueche.com"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="admin@company.com"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">User Phone No</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    type="text"
+                    maxLength={10}
+                    className="onboarding-input"
+                    value={form.user_phone_no}
+                    onChange={(e) =>
+                      setForm({ ...form, user_phone_no: e.target.value.replace(/\D/g, '').slice(0, 10) })
+                    }
+                    placeholder="9876543210"
+                  />
+                </div>
+              </div>
+              {needsSapConfig && (
+                <div className="onboarding-field">
+                  <label className="onboarding-label">Base URL</label>
+                  <div className="onboarding-input-wrapper">
+                    <input
+                      type="text"
+                      className="onboarding-input"
+                      value={form.base_url}
+                      onChange={(e) => setForm({ ...form, base_url: e.target.value })}
+                      placeholder="https://ikyam.in:50000/b1s/v2"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {needsSapConfig && (
+              <>
+                <div className="onboarding-grid-2">
+                  <div className="onboarding-field">
+                    <label className="onboarding-label">SAP DB Name</label>
+                    <div className="onboarding-input-wrapper">
+                      <input
+                        type="text"
+                        className="onboarding-input"
+                        value={form.sap_db}
+                        onChange={(e) => setForm({ ...form, sap_db: e.target.value })}
+                        placeholder="PRODUCTION"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="onboarding-field">
+                    <label className="onboarding-label">DB Type</label>
+                    <div className="onboarding-input-wrapper">
+                      <input
+                        type="text"
+                        className="onboarding-input"
+                        value={form.db_type}
+                        onChange={(e) => setForm({ ...form, db_type: e.target.value })}
+                        placeholder="HANA / MSSQL"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="onboarding-grid-2">
+                  <div className="onboarding-field">
+                    <label className="onboarding-label">SAP Username</label>
+                    <div className="onboarding-input-wrapper">
+                      <input
+                        type="text"
+                        className="onboarding-input"
+                        value={form.sap_username}
+                        onChange={(e) => setForm({ ...form, sap_username: e.target.value })}
+                        placeholder="manager"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="onboarding-field">
+                    <label className="onboarding-label">SAP Password</label>
+                    <div className="onboarding-input-wrapper">
+                      <input
+                        type={showSapPw ? 'text' : 'password'}
+                        className="onboarding-input"
+                        style={{ paddingRight: 38 }}
+                        value={form.sap_password}
+                        onChange={(e) => setForm({ ...form, sap_password: e.target.value })}
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        className="onboarding-toggle-pw"
+                        onClick={() => setShowSapPw((v) => !v)}
+                        title={showSapPw ? 'Hide password' : 'Show password'}
+                      >
+                        {showSapPw ? (
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                          </svg>
+                        ) : (
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* SECTION 4: SMTP CONFIG */}
+          <div className="onboarding-section-card" style={{ marginTop: 20 }}>
+            <div className="onboarding-section-title">✉️ 4. SMTP &amp; Email Server Config</div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">SMTP Email ID</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    type="email"
+                    className="onboarding-input"
+                    value={form.email_id}
+                    onChange={(e) => setForm({ ...form, email_id: e.target.value })}
+                    placeholder="prod.admin@ikyam.com"
                   />
                 </div>
               </div>
 
               <div className="onboarding-field">
-                <label className="onboarding-label">Password</label>
+                <label className="onboarding-label">SMTP Password</label>
                 <div className="onboarding-input-wrapper">
-                  <span className="onboarding-input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                  </span>
                   <input
-                    required
-                    minLength={8}
-                    type={showPassword ? 'text' : 'password'}
+                    type={showSmtpPw ? 'text' : 'password'}
                     className="onboarding-input"
-                    value={workspace.admin_password}
-                    onChange={(e) => setWorkspace({ ...workspace, admin_password: e.target.value })}
-                    placeholder="At least 8 characters"
+                    style={{ paddingRight: 38 }}
+                    value={form.email_pwd}
+                    onChange={(e) => setForm({ ...form, email_pwd: e.target.value })}
+                    placeholder="••••••••"
                   />
                   <button
                     type="button"
                     className="onboarding-toggle-pw"
-                    onClick={() => setShowPassword((v) => !v)}
-                    title={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowSmtpPw((v) => !v)}
+                    title={showSmtpPw ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    {showSmtpPw ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
                         <line x1="1" y1="1" x2="23" y2="23" />
                       </svg>
                     ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                         <circle cx="12" cy="12" r="3" />
                       </svg>
@@ -260,119 +622,159 @@ export default function Onboarding() {
                   </button>
                 </div>
               </div>
+            </div>
 
-              <button type="submit" className="onboarding-submit-btn" disabled={saving}>
-                {saving ? (
-                  <>
-                    <span className="onboarding-spinner" />
-                    <span>Creating workspace…</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Continue to company details</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {step === 2 && (
-            <form className="onboarding-form" onSubmit={submitCompany}>
-              <div className="onboarding-form-section-title">Primary Business Entity</div>
-
-              <div className="onboarding-grid-2">
-                <div className="onboarding-field">
-                  <label className="onboarding-label">Company Code</label>
-                  <div className="onboarding-input-wrapper">
-                    <span className="onboarding-input-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                        <polyline points="2 17 12 22 22 17" />
-                        <polyline points="2 12 12 17 22 12" />
-                      </svg>
-                    </span>
-                    <input
-                      required
-                      type="text"
-                      className="onboarding-input"
-                      value={company.code}
-                      onChange={(e) => setCompany({ ...company, code: e.target.value })}
-                      placeholder="e.g. WKG"
-                    />
-                  </div>
-                </div>
-
-                <div className="onboarding-field">
-                  <label className="onboarding-label">Company Name</label>
-                  <div className="onboarding-input-wrapper">
-                    <span className="onboarding-input-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M3 21h18M3 7v14M21 7v14M6 11h4M6 15h4M14 11h4M14 15h4M9 3h6v4H9z" />
-                      </svg>
-                    </span>
-                    <input
-                      required
-                      type="text"
-                      className="onboarding-input"
-                      value={company.name}
-                      onChange={(e) => setCompany({ ...company, name: e.target.value })}
-                      placeholder="Würfel Küche Pvt. Ltd."
-                    />
-                  </div>
-                </div>
-              </div>
-
+            <div className="onboarding-grid-2">
               <div className="onboarding-field">
-                <label className="onboarding-label">SAP B1 Company DB (Optional)</label>
+                <label className="onboarding-label">SMTP Server Host</label>
                 <div className="onboarding-input-wrapper">
-                  <span className="onboarding-input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <ellipse cx="12" cy="5" rx="9" ry="3" />
-                      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                    </svg>
-                  </span>
                   <input
                     type="text"
                     className="onboarding-input"
-                    value={company.erp_company_db}
-                    onChange={(e) => setCompany({ ...company, erp_company_db: e.target.value })}
-                    placeholder="e.g. WURFEL_PROD"
+                    value={form.smtp_server}
+                    onChange={(e) => setForm({ ...form, smtp_server: e.target.value })}
+                    placeholder="smtp.office365.com"
                   />
                 </div>
               </div>
 
-              <button type="submit" className="onboarding-submit-btn" disabled={saving}>
-                {saving ? (
-                  <>
-                    <span className="onboarding-spinner" />
-                    <span>Finalizing setup…</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Finish setup → Go to User Management</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          <div className="onboarding-form-footer">
-            <span>Already have a workspace?</span>
-            <Link to="/login" className="onboarding-link">
-              Sign in →
-            </Link>
+              <div className="onboarding-field">
+                <label className="onboarding-label">SMTP Port</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    type="text"
+                    className="onboarding-input"
+                    value={form.smtp_port}
+                    onChange={(e) => setForm({ ...form, smtp_port: e.target.value })}
+                    placeholder="587"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* SECTION 5: ACCOUNT STATUS & TENANT SETTINGS */}
+          {/* <div className="onboarding-section-card" style={{ marginTop: 20 }}>
+            <div className="onboarding-section-title">⚙️ 5. Status &amp; Schema Settings</div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">Active Status</label>
+                <div className="onboarding-input-wrapper">
+                  <select
+                    className="onboarding-input"
+                    value={form.is_active ? 'true' : 'false'}
+                    onChange={(e) => setForm({ ...form, is_active: e.target.value === 'true' })}
+                    style={{ background: 'transparent' }}
+                  >
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="onboarding-field">
+                <label className="onboarding-label">Approval Status</label>
+                <div className="onboarding-input-wrapper">
+                  <select
+                    className="onboarding-input"
+                    value={form.is_approved ? 'true' : 'false'}
+                    onChange={(e) => setForm({ ...form, is_approved: e.target.value === 'true' })}
+                    style={{ background: 'transparent' }}
+                  >
+                    <option value="true">Approved</option>
+                    <option value="false">Pending Approval</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="onboarding-grid-2">
+              <div className="onboarding-field">
+                <label className="onboarding-label">Schema ID</label>
+                <div className="onboarding-input-wrapper">
+                  <input
+                    type="text"
+                    className="onboarding-input"
+                    value={form.schema_id}
+                    onChange={(e) => setForm({ ...form, schema_id: e.target.value })}
+                    placeholder="ik_crm_b1"
+                  />
+                </div>
+              </div>
+
+              {form.onboard_company_id && (
+                <div className="onboarding-field">
+                  <label className="onboarding-label">Onboarding ID</label>
+                  <div className="onboarding-input-wrapper" style={{ opacity: 0.7 }}>
+                    <input
+                      readOnly
+                      type="text"
+                      className="onboarding-input"
+                      value={form.onboard_company_id}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div> */}
+
+          <div className="rowx sp" style={{ marginTop: 24 }}>
+            {isSuperAdmin && (
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => navigate('/onboarding-list')}
+              >
+                ← Back to List
+              </button>
+            )}
+            <button
+              type="submit"
+              className="onboarding-submit-btn"
+              disabled={saving}
+              style={{ padding: '12px 28px', marginLeft: 'auto' }}
+            >
+              {saving ? (
+                <>
+                  <span className="onboarding-spinner" />
+                  <span>{isEditMode ? 'Updating details…' : 'Submitting details…'}</span>
+                </>
+              ) : (
+                <span>{isEditMode ? 'Update Onboarding Details ✓' : 'Submit Onboarding Details ✓'}</span>
+              )}
+            </button>
+          </div>
+
+          {!auth && (
+            <div className="onboarding-form-footer">
+              <span>Already have a workspace?</span>
+              <Link to="/login" className="onboarding-link">
+                Sign in →
+              </Link>
+            </div>
+          )}
+        </form>
       </div>
+    </div>
+  )
+
+  if (auth) {
+    return (
+      <AppShell>
+        <div style={{ padding: '10px 0' }}>{formContent}</div>
+      </AppShell>
+    )
+  }
+
+  return (
+    <div className="onboarding-page">
+      <div className="onboarding-bg-glow">
+        <div className="onboarding-glow-1" />
+        <div className="onboarding-glow-2" />
+        <div className="onboarding-grid-pattern" />
+      </div>
+      {formContent}
     </div>
   )
 }

@@ -1,0 +1,16 @@
+/* Accounts screen — layout specific to this page only. */
+
+.accounts-page .split {
+  grid-template-columns: 340px 1fr;
+}
+
+.accounts-page .lst {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 940px) {
+  .accounts-page .split {
+    grid-template-columns: 1fr;
+  }
+}

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import AppShell from '../components/AppShell'
 import { activitiesApi } from '../api/endpoints'
 import { currentCompanyId } from '../api/client'
+import '../styles/ikyam-mock.css'
+import './Activities.css'
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -43,44 +45,46 @@ export default function Activities() {
 
   return (
     <AppShell>
-      <div className="scr-head"><h2>Activities</h2><span className="goal">Every call, task, and meeting — one queue.</span></div>
+      <div className="ikyam-mock activities-page">
+        <div className="scr-head"><h2>Activities</h2><span className="goal">Every call, task, and meeting — one queue, not scattered across records.</span></div>
 
-      <div className="topbar" style={{ border: 0, background: 'transparent', padding: '0 0 12px' }}>
-        <div className="rowx">
-          {FILTERS.map((f) => (
-            <span key={f.key} className={`chip actchip ${filter === f.key ? 'on' : ''}`} onClick={() => setFilter(f.key)}>{f.label}</span>
-          ))}
+        <div className="rowx sp activities-toolbar">
+          <div className="rowx">
+            {FILTERS.map((f) => (
+              <span key={f.key} className={`chip actchip ${filter === f.key ? 'on' : ''}`} onClick={() => setFilter(f.key)}>{f.label}</span>
+            ))}
+          </div>
+          <button className="btn pri" onClick={() => setShowNew((v) => !v)}>＋ New activity</button>
         </div>
-        <button className="btn pri" onClick={() => setShowNew((v) => !v)}>＋ New activity</button>
+
+        {showNew && (
+          <div className="card" style={{ marginBottom: 14 }}>
+            <form onSubmit={createActivity}>
+              <div className="grid" style={{ gridTemplateColumns: '1fr 2fr', gap: 10 }}>
+                <select value={form.activity_type} onChange={(e) => setForm({ ...form, activity_type: e.target.value })} style={fieldInput}>
+                  <option value="call">Call</option>
+                  <option value="task">Task</option>
+                  <option value="meeting">Meeting</option>
+                  <option value="email">Email</option>
+                </select>
+                <input required placeholder="Subject" value={form.subject}
+                  onChange={(e) => setForm({ ...form, subject: e.target.value })} style={fieldInput} />
+              </div>
+              <div className="rowx sp" style={{ marginTop: 9 }}>
+                <span />
+                <span className="rowx">
+                  <button type="button" className="btn ghost" onClick={() => setShowNew(false)}>Cancel</button>
+                  <button className="btn pri">Add to queue</button>
+                </span>
+              </div>
+            </form>
+          </div>
+        )}
+
+        <ActivitySection title="Overdue" items={overdue} onComplete={complete} tone="risk" />
+        <ActivitySection title="Today & open" items={open} onComplete={complete} />
+        <ActivitySection title="Completed" items={done} onComplete={complete} />
       </div>
-
-      {showNew && (
-        <div className="card" style={{ marginBottom: 14 }}>
-          <form onSubmit={createActivity}>
-            <div className="grid" style={{ gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-              <select value={form.activity_type} onChange={(e) => setForm({ ...form, activity_type: e.target.value })} style={fieldInput}>
-                <option value="call">Call</option>
-                <option value="task">Task</option>
-                <option value="meeting">Meeting</option>
-                <option value="email">Email</option>
-              </select>
-              <input required placeholder="Subject" value={form.subject}
-                onChange={(e) => setForm({ ...form, subject: e.target.value })} style={fieldInput} />
-            </div>
-            <div className="rowx sp" style={{ marginTop: 9 }}>
-              <span />
-              <span className="rowx">
-                <button type="button" className="btn ghost" onClick={() => setShowNew(false)}>Cancel</button>
-                <button className="btn pri">Add to queue</button>
-              </span>
-            </div>
-          </form>
-        </div>
-      )}
-
-      <ActivitySection title="Overdue" items={overdue} onComplete={complete} tone="risk" />
-      <ActivitySection title="Open" items={open} onComplete={complete} />
-      <ActivitySection title="Completed" items={done} onComplete={complete} />
     </AppShell>
   )
 }
@@ -89,7 +93,7 @@ function ActivitySection({ title, items, onComplete, tone }) {
   if (items.length === 0) return null
   return (
     <>
-      <div className="lab" style={{ marginTop: 16, color: tone ? `var(--${tone === 'risk' ? 'orange' : 'ink'}-ink)` : undefined }}>{title}</div>
+      <div className="lab" style={{ marginTop: 16, color: tone === 'risk' ? 'var(--orange-ink)' : undefined }}>{title}</div>
       {items.map((a) => (
         <div className="card hov" key={a.id} style={{ marginTop: 8, padding: '10px 12px' }}>
           <div className="rowx sp">

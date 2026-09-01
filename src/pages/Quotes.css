@@ -1,0 +1,46 @@
+/* Quote builder screen — layout specific to this page only. */
+
+.quotes-link {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.quotes-remove {
+  cursor: pointer;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.quotes-remove:hover {
+  color: var(--orange-ink);
+}
+
+.quotes-bottom-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+  align-items: start;
+}
+
+.quotes-ai-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quotes-totals-card {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 940px) {
+  .quotes-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}

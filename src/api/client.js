@@ -1,8 +1,9 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-
+const API_BASE_URL = 'https://products.ikyam.in/crm_api'
+// const API_BASE_URL = 'http://localhost:8000/crm_api'
 export const api = axios.create({ baseURL: API_BASE_URL })
+export const WS_BASE_URL = API_BASE_URL.replace(/^https/, 'wss')
 
 function getStoredAuth() {
   const raw = localStorage.getItem('ikyam_auth')
@@ -25,11 +26,17 @@ export function setCurrentCompanyId(id) {
   localStorage.setItem('ikyam_company_id', id)
 }
 
-// Attach the access token to every outgoing request.
+export function getAuthToken() {
+  const auth = getStoredAuth()
+  return auth?.token || auth?.access_token || ''
+}
+
+// Attach the bearer token to every outgoing request.
 api.interceptors.request.use((config) => {
   const auth = getStoredAuth()
-  if (auth?.access_token) {
-    config.headers.Authorization = `Bearer ${auth.access_token}`
+  const token = auth?.token || auth?.access_token
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
@@ -47,7 +54,7 @@ api.interceptors.response.use(
       const auth = getStoredAuth()
       if (!auth?.refresh_token) {
         clearAuth()
-        window.location.href = '/login'
+        // window.location.href = '/login'
         return Promise.reject(error)
       }
       try {

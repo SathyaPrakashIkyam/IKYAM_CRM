@@ -1,0 +1,30 @@
+/* Reports screen — layout specific to this page only. */
+
+.reports-shell {
+  grid-template-columns: 206px 1fr;
+  height: auto;
+  padding: 0;
+  gap: 0;
+}
+
+.reports-shell .rail {
+  height: auto;
+  position: static;
+  border-radius: 14px 0 0 14px;
+  border-right: 1px solid var(--line);
+}
+
+.reports-shell .main {
+  height: auto;
+}
+
+.rpt-select {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 7px 12px;
+  font: 600 12px var(--b);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+

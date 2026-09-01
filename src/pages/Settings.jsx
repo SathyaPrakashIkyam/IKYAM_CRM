@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import AppShell from '../components/AppShell'
-import { settingsApi } from '../api/endpoints'
+import { settingsApi, aiChatApi } from '../api/endpoints'
+import '../styles/ikyam-mock.css'
+import './Settings.css'
 
 const TABS = [
   { key: 'general', label: '⚙ General' },
   { key: 'fields', label: '▤ Custom fields' },
-  { key: 'api', label: '◇ API & webhooks' },
+  { key: 'ai', label: '✦ AI Assistant' },
 ]
 
 export default function Settings() {
@@ -13,22 +15,26 @@ export default function Settings() {
 
   return (
     <AppShell>
-      <div className="scr-head"><h2>Settings</h2><span className="goal">Workspace-level configuration.</span></div>
-      <div className="frame">
-        <div className="shell" style={{ gridTemplateColumns: '206px 1fr' }}>
-          <aside className="rail">
-            <div className="nav">
-              {TABS.map((t) => (
-                <a key={t.key} href="#" className={tab === t.key ? 'sel' : ''}
-                  onClick={(e) => { e.preventDefault(); setTab(t.key) }}>{t.label}</a>
-              ))}
+      <div className="ikyam-mock settings-page">
+        <div className="scr-head"><h2>Settings</h2><span className="goal">Workspace-level configuration — separate from user management, which is about people.</span></div>
+        <div className="frame">
+          <div className="shell settings-shell">
+            <aside className="rail">
+              <div className="nav">
+                {TABS.map((t) => (
+                  <a key={t.key} href="#" className={tab === t.key ? 'sel' : ''}
+                    onClick={(e) => { e.preventDefault(); setTab(t.key) }}>{t.label}</a>
+                ))}
+              </div>
+            </aside>
+            <div className="main">
+              <div className="content">
+                {tab === 'general' && <GeneralPanel />}
+                {tab === 'fields' && <CustomFieldsPanel />}
+                {tab === 'ai' && <AiAssistantPanel />}
+              </div>
             </div>
-          </aside>
-          <div className="main"><div className="content">
-            {tab === 'general' && <GeneralPanel />}
-            {tab === 'fields' && <CustomFieldsPanel />}
-            {tab === 'api' && <ApiPanel />}
-          </div></div>
+          </div>
         </div>
       </div>
     </AppShell>
@@ -40,7 +46,12 @@ function GeneralPanel() {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    settingsApi.getGeneral().then((data) => setForm((f) => ({ ...f, workspace_name: data.workspace_name })))
+    settingsApi.getGeneral().then((data) => setForm((f) => ({
+      ...f,
+      workspace_name: data.workspace_name,
+      default_currency: data.settings?.default_currency || f.default_currency,
+      timezone: data.settings?.timezone || f.timezone,
+    })))
   }, [])
 
   async function save(e) {
@@ -63,7 +74,7 @@ function GeneralPanel() {
       </div>
       <div className="rowx" style={{ marginTop: 12, gap: 10 }}>
         <button className="btn pri">Save changes</button>
-        {saved && <span className="tiny">✓ Saved</span>}
+        {saved && <span className="chip ok">✓ Saved</span>}
       </div>
     </form>
   )
@@ -96,6 +107,7 @@ function CustomFieldsPanel() {
           {fields.map((f) => (
             <tr key={f.id}><td>{f.object_api_name}</td><td>{f.label}</td><td>{f.field_type}</td></tr>
           ))}
+          {fields.length === 0 && <tr><td colSpan={3} className="tiny">No custom fields yet.</td></tr>}
         </tbody>
       </table>
 
@@ -119,50 +131,74 @@ function CustomFieldsPanel() {
   )
 }
 
-function ApiPanel() {
+function AiAssistantPanel() {
   const [keys, setKeys] = useState([])
-  const [webhooks, setWebhooks] = useState([])
-  const [newKey, setNewKey] = useState(null)
+  const [newKey, setNewKey] = useState('')
+  const [saving, setSaving] = useState(false)
 
   function load() {
-    settingsApi.apiKeys().then(setKeys)
-    settingsApi.webhooks().then(setWebhooks)
+    aiChatApi.keys().then(setKeys)
   }
   useEffect(load, [])
 
-  async function createKey() {
-    const created = await settingsApi.createApiKey('Default key')
-    setNewKey(created.full_key)
+  async function addKey(e) {
+    e.preventDefault()
+    if (!newKey.trim()) return
+    setSaving(true)
+    try {
+      await aiChatApi.addKey(newKey.trim())
+      setNewKey('')
+      load()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deactivate(id) {
+    await aiChatApi.deactivateKey(id)
     load()
   }
 
-  async function addWebhook() {
-    const url = window.prompt('Webhook URL?', 'https://hooks.example.com/crm')
-    if (!url) return
-    const event_type = window.prompt('Event type?', 'lead.converted') || 'lead.converted'
-    await settingsApi.createWebhook({ url, event_type })
-    load()
-  }
+  const activeCount = keys.filter((k) => k.is_active).length
 
   return (
     <>
-      <b style={{ font: '600 15px var(--d)' }}>API &amp; webhooks</b>
-      <div className="card" style={{ marginTop: 10 }}>
-        {newKey && <div className="chip ok" style={{ display: 'block', marginBottom: 8 }}>New key (copy now — shown once): <span className="mono">{newKey}</span></div>}
-        {keys.map((k) => (
-          <div className="fld" key={k.id}><span className="lab">{k.name}</span><span className="mono">{k.key_prefix}••••••••</span></div>
-        ))}
-        <button className="btn" onClick={createKey}>Generate new key</button>
-      </div>
+      <b style={{ font: '600 15px var(--d)' }}>AI Assistant — Gemini API keys</b>
+      <p className="tiny" style={{ marginTop: 4, color: 'var(--mut)' }}>
+        Powers the chat bubble in the corner of every screen. Add one key, or several —
+        with more than one active key, each chat request automatically rotates to
+        whichever key was used longest ago, and falls through to the next one if a
+        request fails.
+      </p>
 
-      <div className="lab" style={{ marginTop: 14 }}>Webhooks</div>
-      {webhooks.map((w) => (
-        <div className="card hov" key={w.id} style={{ marginTop: 8 }}>
-          <b style={{ fontSize: 12.5 }}>{w.event_type}</b>
-          <div className="tiny mono">{w.url}</div>
-        </div>
-      ))}
-      <button className="btn pri" style={{ marginTop: 10 }} onClick={addWebhook}>＋ Add webhook</button>
+      <div className="card" style={{ marginTop: 10 }}>
+        {keys.length === 0 && <div className="tiny" style={{ marginBottom: 8 }}>No Gemini API key configured yet — the chat widget won't work until you add one.</div>}
+        {keys.map((k) => (
+          <div className="fld rowx sp" key={k.global_key_id}>
+            <div>
+              <span className="mono">{k.masked_key}</span>{' '}
+              <span className={`chip ${k.is_active ? 'ok' : ''}`} style={{ marginLeft: 6 }}>{k.is_active ? 'Active' : 'Deactivated'}</span>
+              {k.last_used_at && <div className="tiny" style={{ color: 'var(--mut)' }}>Last used {new Date(k.last_used_at).toLocaleString()}</div>}
+            </div>
+            {k.is_active && (
+              <span className="tiny" style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--orange-ink)' }} onClick={() => deactivate(k.global_key_id)}>
+                Deactivate
+              </span>
+            )}
+          </div>
+        ))}
+
+        <form className="rowx" style={{ marginTop: keys.length ? 12 : 0, gap: 8 }} onSubmit={addKey}>
+          <input
+            type="password"
+            value={newKey}
+            onChange={(e) => setNewKey(e.target.value)}
+            placeholder="Paste a Gemini API key…"
+            style={{ ...fieldInput, flex: 1 }}
+          />
+          <button className="btn pri" disabled={saving}>{saving ? 'Adding…' : `＋ Add ${activeCount > 0 ? 'another' : ''} key`}</button>
+        </form>
+      </div>
     </>
   )
 }

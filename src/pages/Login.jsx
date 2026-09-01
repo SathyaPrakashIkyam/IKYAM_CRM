@@ -1,17 +1,32 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { authApi } from '../api/endpoints'
 import { useAuth } from '../context/AuthContext'
-import { IKYAM_LOGO } from '../assets/logo'
+import ikyamLogo from '../assets/ikyam-relatepro-logo.png'
+import '../styles/ikyam-mock.css'
 import '../styles/login.css'
 
 export default function Login() {
-  const [form, setForm] = useState({ subdomain: '', email: '', password: '' })
+  const [form, setForm] = useState({ email: '', password: '' })
+  const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const navigate = useNavigate()
   const { login } = useAuth()
+
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('ikyam_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('ikyam_theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -19,17 +34,63 @@ export default function Login() {
     setSaving(true)
     try {
       const tokens = await authApi.login(form)
+      console.log(tokens)
       login(tokens)
-      navigate('/today')
+      const roleStr = (tokens?.role || '').toUpperCase()
+      if (roleStr === 'SUPER_ADMIN' || roleStr === 'SUPER ADMIN') {
+        navigate('/onboarding-list')
+      } else if (roleStr === 'COMPANY_ADMIN' || roleStr === 'COMPANY ADMIN') {
+        navigate('/users')
+      } else {
+        navigate('/today')
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Incorrect email or password')
+      console.error('Login error:', err)
+      const detail = err.response?.data?.detail
+      const errMsg =
+        typeof detail === 'string'
+          ? detail
+          : detail?.message || err.response?.data?.message || 'Incorrect email or password'
+      setError(errMsg)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="login-page">
+    <div className="ikyam-mock login-page">
+      {/* Top right theme toggle */}
+      <button
+        type="button"
+        className="login-theme-toggle"
+        onClick={toggleTheme}
+        title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      >
+        {theme === 'dark' ? (
+          <>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+            <span>Light mode</span>
+          </>
+        ) : (
+          <>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+            <span>Dark mode</span>
+          </>
+        )}
+      </button>
+
       {/* Ambient background glow & grid pattern */}
       <div className="login-bg-glow">
         <div className="login-glow-1" />
@@ -42,17 +103,22 @@ export default function Login() {
         {/* Left Side: Brand & Feature Showcase */}
         <div className="login-hero-panel">
           <div className="login-hero-header">
-            <img src={IKYAM_LOGO} alt="Ikyam CRM" style={{ height: 26 }} />
-            <span className="login-brand-tag">✨ AI-Powered CRM</span>
+            <img src={ikyamLogo} alt="Ikyam RelatePro" style={{ height: 28 }} />
+            <span className="login-brand-tag">⚡ Next-Gen Intelligence</span>
           </div>
 
           <div className="login-hero-body">
             <h1 className="login-hero-title">
-              Manage deals & grow sales with <span className="gradient-text">Ikyam CRM</span>
+              Manage deals &amp; scale revenue with <span className="gradient-text">Ikyam CRM</span>
             </h1>
             <p className="login-hero-desc">
-              Next-generation intelligence platform to streamline pipelines, forecast revenue, and manage accounts effortlessly.
+              AI-powered sales pipeline platform designed for high-performing teams to convert leads and predict revenue accurately.
             </p>
+
+            <div className="login-metric-pill">
+              <span className="pill-dot" />
+              <span className="pill-text"><b>+34%</b> Average deal velocity boost</span>
+            </div>
 
             <div className="login-feature-list">
               <div className="login-feature-card">
@@ -62,8 +128,8 @@ export default function Login() {
                   </svg>
                 </div>
                 <div className="login-feature-text">
-                  <h4>Kanban Pipeline Tracking</h4>
-                  <p>Drag and drop deals across stages effortlessly.</p>
+                  <h4>Visual Kanban Pipeline</h4>
+                  <p>Drag, drop, and automate deals through stages.</p>
                 </div>
               </div>
 
@@ -74,8 +140,8 @@ export default function Login() {
                   </svg>
                 </div>
                 <div className="login-feature-text">
-                  <h4>Real-time Sync & Insights</h4>
-                  <p>Automated activity tracking & quarterly dashboards.</p>
+                  <h4>Real-time Sync &amp; AI Forecast</h4>
+                  <p>Predict deal health &amp; conversion probability live.</p>
                 </div>
               </div>
             </div>
@@ -83,7 +149,7 @@ export default function Login() {
 
           <div className="login-hero-footer">
             <span className="login-status-dot" />
-            <span>Systems operational & synced</span>
+            <span>Systems operational &amp; enterprise encrypted</span>
           </div>
         </div>
 
@@ -91,7 +157,7 @@ export default function Login() {
         <div className="login-form-panel">
           <div className="login-form-header">
             <h2>Welcome back</h2>
-            <p>Enter your workspace credentials to sign in</p>
+            <p>Sign in to access your CRM workspace</p>
           </div>
 
           {error && (
@@ -107,26 +173,6 @@ export default function Login() {
 
           <form className="login-form" onSubmit={submit}>
             <div className="login-field">
-              <label className="login-label">Workspace Subdomain</label>
-              <div className="login-input-wrapper">
-                <span className="login-input-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                  </svg>
-                </span>
-                <input
-                  required
-                  type="text"
-                  className="login-input"
-                  value={form.subdomain}
-                  onChange={(e) => setForm({ ...form, subdomain: e.target.value })}
-                  placeholder="e.g. wurfel"
-                />
-              </div>
-            </div>
-
-            <div className="login-field">
               <label className="login-label">Work Email</label>
               <div className="login-input-wrapper">
                 <span className="login-input-icon">
@@ -141,13 +187,15 @@ export default function Login() {
                   className="login-input"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="prem@wurfelkueche.com"
+                  placeholder="name@company.com"
                 />
               </div>
             </div>
 
             <div className="login-field">
-              <label className="login-label">Password</label>
+              <div className="rowx sp">
+                <label className="login-label">Password</label>
+              </div>
               <div className="login-input-wrapper">
                 <span className="login-input-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -184,6 +232,17 @@ export default function Login() {
               </div>
             </div>
 
+            <div className="login-remember-row">
+              <label className="login-remember-label">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <span>Remember me on this device</span>
+              </label>
+            </div>
+
             <button type="submit" className="login-submit-btn" disabled={saving}>
               {saving ? (
                 <>
@@ -192,7 +251,7 @@ export default function Login() {
                 </>
               ) : (
                 <>
-                  <span>Sign in</span>
+                  <span>Sign in to Dashboard</span>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <line x1="5" y1="12" x2="19" y2="12" />
                     <polyline points="12 5 19 12 12 19" />
@@ -203,9 +262,9 @@ export default function Login() {
           </form>
 
           <div className="login-form-footer">
-            <span>New workspace?</span>
+            <span>Don't have a workspace?</span>
             <Link to="/onboarding" className="login-link">
-              Set one up →
+              Create workspace →
             </Link>
           </div>
         </div>
@@ -213,4 +272,5 @@ export default function Login() {
     </div>
   )
 }
+
 

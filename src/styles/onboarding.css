@@ -3,13 +3,13 @@
    ========================================================================== */
 
 .onboarding-page {
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
   background: var(--bg);
   padding: 32px 24px;
 }
@@ -63,30 +63,57 @@
 
 /* Main Split / Card Container */
 .onboarding-card-container {
-  position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 980px;
-  min-height: 600px;
   display: grid;
   grid-template-columns: 1fr 1.15fr;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  box-shadow: var(--shadow-lift), 0 20px 60px rgba(15, 16, 60, 0.08);
   overflow: hidden;
   animation: onboardingFadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.onboarding-card-container.full-width {
+  display: block;
+  max-width: 100%;
+}
+
+.onboarding-card-container.full-width .onboarding-form-panel {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 36px 40px;
 }
 
 @keyframes onboardingFadeUp {
   from {
     opacity: 0;
-    transform: translateY(18px) scale(0.98);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
+}
+
+.onboarding-toggle-pw {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--mut);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+  z-index: 2;
+}
+
+.onboarding-toggle-pw:hover {
+  color: var(--ink);
+  background: var(--surface2);
 }
 
 /* Left Hero Panel */
@@ -137,6 +164,7 @@
 .onboarding-hero-title .gradient-text {
   background: var(--arc);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -250,6 +278,26 @@
   font-size: 13px;
 }
 
+/* Section Cards inside Single Form */
+.onboarding-section-card {
+  /* background: var(--surface2); */
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.onboarding-section-title {
+  font: 700 14px var(--d);
+  color: var(--ink);
+  letter-spacing: -0.2px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+
 /* Progress Step Indicator Bar */
 .onboarding-progress-bar {
   display: flex;
@@ -335,7 +383,7 @@
 
 .onboarding-grid-2 {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
 
@@ -386,12 +434,17 @@
 .onboarding-input {
   width: 100%;
   height: 44px;
-  padding: 0 14px 0 42px;
+  padding: 0 14px;
   border: 0;
   background: transparent;
   color: var(--ink);
   font: 500 13.5px var(--b);
   outline: none;
+}
+
+.onboarding-input-icon + .onboarding-input,
+.onboarding-input-wrapper:has(.onboarding-input-icon) .onboarding-input {
+  padding-left: 40px;
 }
 
 .onboarding-input::placeholder {
@@ -542,7 +595,7 @@
 @media (max-width: 880px) {
   .onboarding-card-container {
     grid-template-columns: 1fr;
-    max-width: 520px;
+    max-width: 100%;
     min-height: auto;
   }
 
@@ -551,6 +604,68 @@
   }
 
   .onboarding-form-panel {
-    padding: 36px 28px;
+    padding: 24px 20px;
   }
+}
+
+@media (max-width: 640px) {
+  .onboarding-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .onboarding-form-panel {
+    padding: 20px 14px;
+  }
+
+  .onboarding-progress-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .onboarding-step-divider {
+    display: none;
+  }
+}
+
+/* Standalone / SAP B1 source toggle (Section 3) */
+.onboarding-source-toggle {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.onboarding-source-toggle button {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line2);
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 12.5px var(--b);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.onboarding-source-toggle button:hover {
+  border-color: var(--brand);
+}
+
+.onboarding-source-toggle button.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+[data-theme="dark"] .onboarding-source-toggle button.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-ink);
+}
+
+.onboarding-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--mut);
 }
