@@ -199,92 +199,94 @@ export default function Users() {
             No users found in user master list.
           </div>
         ) : (
-          <table className="qtable">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email &amp; Mobile</th>
-                <th>Role</th>
-                <th>Address</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((u, idx) => {
-                const roleUpper = (u.role || '').toUpperCase()
-                const isCompAdmin = roleUpper === 'COMPANY_ADMIN' || roleUpper === 'COMPANY ADMIN'
+          <div className="table-card">
+            <table className="qtable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email &amp; Mobile</th>
+                  <th>Role</th>
+                  <th>Address</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((u, idx) => {
+                  const roleUpper = (u.role || '').toUpperCase()
+                  const isCompAdmin = roleUpper === 'COMPANY_ADMIN' || roleUpper === 'COMPANY ADMIN'
 
-                return (
-                  <tr key={u.user_id || u.email || idx}>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: 13.5 }}>
-                        {u.user_name || u.full_name || '—'}
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{u.email || '—'}</div>
-                      <div className="tiny mut">{u.mobile_number || u.phone || '—'}</div>
-                    </td>
-                    <td>
-                      <span className="chip brand" style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>
-                        {u.role || '—'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="tiny mut">{u.city ? `${u.city}${u.country ? `, ${u.country}` : ''}` : u.location || '—'}</div>
-                    </td>
-                    <td>
-                      {isCompAdmin ? (
-                        <span className={`chip ${u.is_active !== false ? 'ok' : 'risk'}`}>
-                          {u.is_active !== false ? 'Active' : 'Inactive'}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={updatingStatusId === u.user_id}
-                          className={`chip ${u.is_active !== false ? 'ok' : 'risk'}`}
-                          style={{ cursor: 'pointer', border: 'none' }}
-                          title="Click to toggle user status"
-                          onClick={() => handleToggleStatus(u)}
-                        >
-                          {updatingStatusId === u.user_id
-                            ? 'Updating…'
-                            : u.is_active !== false
-                            ? 'Active ✓'
-                            : 'Inactive ✕'}
-                        </button>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {isCompAdmin ? (
-                        <span className="tiny mut">—</span>
-                      ) : (
-                        <div className="rowx" style={{ gap: 6, justifyContent: 'flex-end' }}>
-                          <button
-                            type="button"
-                            className="btn"
-                            style={{ padding: '4px 10px', fontSize: 12 }}
-                            onClick={() => navigate('/users/new', { state: { record: u } })}
-                          >
-                            ✏ Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="btn ghost"
-                            style={{ padding: '4px 10px', fontSize: 12 }}
-                            onClick={() => openChangePassword(u)}
-                          >
-                            🔑 Password
-                          </button>
+                  return (
+                    <tr key={u.user_id || u.email || idx} className="hov">
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: 13.5 }}>
+                          {u.user_name || u.full_name || '—'}
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{u.email || '—'}</div>
+                        <div className="tiny mut">{u.mobile_number || u.phone || '—'}</div>
+                      </td>
+                      <td>
+                        <span className="chip brand" style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>
+                          {u.role || '—'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="tiny mut">{u.city ? `${u.city}${u.country ? `, ${u.country}` : ''}` : u.location || '—'}</div>
+                      </td>
+                      <td>
+                        {isCompAdmin ? (
+                          <span className={`chip ${u.is_active !== false ? 'ok' : 'risk'}`}>
+                            {u.is_active !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={updatingStatusId === u.user_id}
+                            className={`chip ${u.is_active !== false ? 'ok' : 'risk'}`}
+                            style={{ cursor: 'pointer', border: 'none' }}
+                            title="Click to toggle user status"
+                            onClick={() => handleToggleStatus(u)}
+                          >
+                            {updatingStatusId === u.user_id
+                              ? 'Updating…'
+                              : u.is_active !== false
+                              ? 'Active ✓'
+                              : 'Inactive ✕'}
+                          </button>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {isCompAdmin ? (
+                          <span className="tiny mut">—</span>
+                        ) : (
+                          <div className="rowx" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{ padding: '4px 10px', fontSize: 12 }}
+                              onClick={() => navigate('/users/new', { state: { record: u } })}
+                            >
+                              ✏ Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="btn ghost"
+                              style={{ padding: '4px 10px', fontSize: 12 }}
+                              onClick={() => openChangePassword(u)}
+                            >
+                              🔑 Password
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

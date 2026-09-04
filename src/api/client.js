@@ -41,45 +41,63 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// On a 401, try refreshing the access token once, then retry the request.
-// If refresh also fails, clear auth and bounce to /login.
+// Global Response Interceptor: Handles 2-hour session expiration and 401 "Not authenticated" errors
 let refreshPromise = null
 
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true
-      const auth = getStoredAuth()
-      if (!auth?.refresh_token) {
-        clearAuth()
-        // window.location.href = '/login'
-        return Promise.reject(error)
-      }
-      try {
-        if (!refreshPromise) {
-          refreshPromise = axios
-            .post(`${API_BASE_URL}/auth/refresh`, { refresh_token: auth.refresh_token })
-            .then((res) => {
-              storeAuth(res.data)
-              refreshPromise = null
-              return res.data
-            })
-            .catch((err) => {
-              refreshPromise = null
-              throw err
-            })
+    const status = error.response?.status
+    const detail = error.response?.data?.detail
+
+    const isUnauthenticated =
+      status === 401 ||
+      detail === 'Not authenticated' ||
+      detail === 'Could not validate credentials' ||
+      (typeof detail === 'string' && detail.toLowerCase().includes('not authenticated'))
+
+    if (isUnauthenticated) {
+      if (original && !original._retry) {
+        original._retry = true
+        const auth = getStoredAuth()
+
+        // If refresh token exists, attempt to refresh token once
+        if (auth?.refresh_token) {
+          try {
+            if (!refreshPromise) {
+              refreshPromise = axios
+                .post(`${API_BASE_URL}/auth/refresh`, { refresh_token: auth.refresh_token })
+                .then((res) => {
+                  storeAuth(res.data)
+                  refreshPromise = null
+                  return res.data
+                })
+                .catch((err) => {
+                  refreshPromise = null
+                  throw err
+                })
+            }
+            const refreshed = await refreshPromise
+            const newToken = refreshed.token || refreshed.access_token
+            if (newToken) {
+              original.headers.Authorization = `Bearer ${newToken}`
+              return api(original)
+            }
+          } catch (refreshError) {
+            // Refresh attempt failed or refresh token expired
+          }
         }
-        const refreshed = await refreshPromise
-        original.headers.Authorization = `Bearer ${refreshed.access_token}`
-        return api(original)
-      } catch (refreshError) {
-        clearAuth()
-        window.location.href = '/login'
-        return Promise.reject(refreshError)
       }
+
+      // Clear local authentication state and redirect immediately to login
+      clearAuth()
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+      return Promise.reject(error)
     }
+
     return Promise.reject(error)
   }
 )

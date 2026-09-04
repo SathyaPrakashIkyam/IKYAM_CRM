@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import ikyamLogo from '../assets/ikyam-relatepro-logo.png'
+import ikyamLogoDark from '../assets/Ikyam_RelatePro_WH_BG.png'
 import { notificationsApi } from '../api/endpoints'
 import AiChatWidget from './AiChatWidget'
 import '../styles/ikyam-mock.css'
@@ -29,10 +30,20 @@ const ALL_NAV_ITEMS = [
   { to: '/executive', label: 'Executive overview', icon: '◈', module: 'EXECUTIVE' },
   { to: '/sync', label: 'Sync Monitor', icon: '⟲', module: 'SYNC_MONITOR' },
   // Admin cluster — kept together and in this exact order (User Management,
-  // Products, Role Management, Settings) since that's how they're meant to
-  // read for a Company Admin, who typically only has this cluster.
+  // Products, Masters [Product Groups, UOMs, Currencies], Role Management, Settings)
   { to: '/users', label: 'User Management', icon: '👤', module: 'USER_MGMT' },
   { to: '/products', label: 'Products', icon: '▧', module: 'PRODUCTS' },
+  {
+    to: '/masters',
+    label: 'Masters',
+    icon: '🗂',
+    adminOnly: true,
+    children: [
+      { to: '/product-groups', label: 'Product Groups', icon: '📁' },
+      { to: '/uoms', label: 'Units of Measure', icon: '📏' },
+      { to: '/currencies', label: 'Currencies', icon: '💱' },
+    ],
+  },
   { to: '/roles', label: 'Role Management', icon: '🛡', module: 'ROLE_MGMT' },
   { to: '/settings', label: 'Settings', icon: '⚙', module: 'SETTINGS' },
 ]
@@ -58,6 +69,18 @@ function withProductsNextTo(items, ...anchorPaths) {
 export default function AppShell({ children, aiPanel }) {
   const { user, tenant, companies, companyId, switchCompany, logout, isSuperAdmin, isCompanyAdmin, can } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const isMasterRoute =
+    location.pathname.startsWith('/product-groups') ||
+    location.pathname.startsWith('/uoms') ||
+    location.pathname.startsWith('/currencies') ||
+    location.pathname.startsWith('/masters')
+  const [mastersOpen, setMastersOpen] = useState(isMasterRoute)
+
+  useEffect(() => {
+    if (isMasterRoute) setMastersOpen(true)
+  }, [isMasterRoute])
+
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('ikyam_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   })
@@ -114,6 +137,7 @@ export default function AppShell({ children, aiPanel }) {
       ]
     : withProductsNextTo(
         ALL_NAV_ITEMS.filter((item) => {
+          if (item.adminOnly && !isCompanyAdmin && !isSuperAdmin) return false
           if (item.requiresAnyOf) return item.requiresAnyOf.some((m) => can(m, 'view'))
           return !item.module || can(item.module, 'view')
         }),
@@ -124,26 +148,122 @@ export default function AppShell({ children, aiPanel }) {
         '/users', '/activities'
       )
 
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem('ikyam_rail_collapsed') === 'true'
+  })
+
+  const toggleRail = () => {
+    setCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem('ikyam_rail_collapsed', String(next))
+      return next
+    })
+  }
+
+  const railWidth = collapsed ? '76px' : '240px'
+
   return (
     <div
-      className={`shell ${useThemedShell ? 'ikyam-mock' : ''}`}
-      style={{ gridTemplateColumns: aiPanel ? '240px 1fr 280px' : '240px 1fr' }}
+      className={`shell ${useThemedShell ? 'ikyam-mock' : ''} ${collapsed ? 'shell-collapsed' : ''}`}
+      style={{ gridTemplateColumns: aiPanel ? `${railWidth} 1fr 280px` : `${railWidth} 1fr` }}
     >
-      <aside className="rail">
-        <div className="logo" style={{ marginBottom: 20, padding: '4px 2px' }}>
-          <img src={ikyamLogo} alt="Ikyam CRM" style={{ height: 60, width: '90%', objectFit: 'contain' }} />
+      <aside className={`rail ${collapsed ? 'collapsed' : ''}`}>
+        <div className="rail-header">
+          <div className="logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img
+              src={theme === 'dark' ? ikyamLogoDark : ikyamLogo}
+              alt="Ikyam CRM"
+              style={{
+                height: collapsed ? 36 : 54,
+                width: collapsed ? 36 : '90%',
+                objectFit: 'contain',
+                transition: 'all 0.3s ease',
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            className="rail-toggle-btn"
+            onClick={toggleRail}
+            title={collapsed ? 'Expand sidebar' : 'Minimize sidebar'}
+          >
+            {collapsed ? '≫' : '≪'}
+          </button>
         </div>
 
         <div className="nav">
-          {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? 'sel' : '')}>
-              <span style={{ fontSize: 16 }}>{item.icon}</span>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+          {navItems.map((item) => {
+            if (item.children) {
+              const isChildActive = item.children.some(
+                (c) => location.pathname === c.to || location.pathname.startsWith(c.to)
+              )
+              return (
+                <div key={item.label} className="nav-parent-item">
+                  <button
+                    type="button"
+                    className={`nav-parent-btn ${isChildActive ? 'active-parent' : ''}`}
+                    title={collapsed ? `${item.label} (${item.children.length})` : undefined}
+                    onClick={() => {
+                      if (collapsed) {
+                        setCollapsed(false)
+                        setMastersOpen(true)
+                      } else {
+                        setMastersOpen((prev) => !prev)
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}>
+                      <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
+                      {!collapsed && <span>{item.label}</span>}
+                    </div>
+                    {!collapsed && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          color: 'var(--mut)',
+                          transition: 'transform 0.2s ease',
+                          transform: mastersOpen ? 'rotate(90deg)' : 'none',
+                          flexShrink: 0,
+                        }}
+                      >
+                        ▶
+                      </span>
+                    )}
+                  </button>
+
+                  {mastersOpen && !collapsed && (
+                    <div className="nav-submenu">
+                      {item.children.map((child) => (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          className={({ isActive }) => (isActive ? 'sel' : '')}
+                        >
+                          <span style={{ fontSize: 13, flexShrink: 0 }}>{child.icon}</span>
+                          <span>{child.label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                title={collapsed ? item.label : undefined}
+                className={({ isActive }) => (isActive ? 'sel' : '')}
+              >
+                <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
+                {!collapsed && <span>{item.label}</span>}
+              </NavLink>
+            )
+          })}
         </div>
 
-        {companies.length > 1 && (
+        {companies.length > 1 && !collapsed && (
           <div style={{ marginTop: 'auto', paddingTop: 16 }}>
             <hr style={{ border: 0, borderTop: '1px solid var(--line)', marginBottom: 12 }} />
             <span className="lab" style={{ padding: '0 10px', display: 'block', marginBottom: 6 }}>Company</span>

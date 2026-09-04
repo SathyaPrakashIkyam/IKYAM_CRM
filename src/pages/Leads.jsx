@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
+import CustomSelect from '../components/CustomSelect'
 import { leadsApi } from '../api/endpoints'
 import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
-import './Leads.css'
+import '../styles/Leads.css'
 
 export default function Leads() {
   const [leads, setLeads] = useState([])
@@ -59,6 +60,7 @@ export default function Leads() {
       <div className="ikyam-mock leads-page">
         <div className="scr-head">
           <h2>Lead inbox &amp; conversion</h2>
+          <div className="title-bar" />
           <span className="goal">Where the sales process starts — Convert qualifies a lead into the Pipeline.</span>
         </div>
         <div className="frame">
@@ -68,52 +70,6 @@ export default function Leads() {
                 <b style={{ font: '600 13px var(--d)' }}>Leads · {leads.length}</b>
                 <button className="btn pri" style={{ padding: '4px 9px' }} onClick={() => setShowNew((v) => !v)}>＋ New lead</button>
               </div>
-
-              {showNew && (
-                <div className="card" style={{ margin: '10px 12px', padding: 14 }}>
-                  <b style={{ font: '600 13px var(--d)', color: 'var(--ink)', display: 'block', marginBottom: 10 }}>＋ Add new lead</b>
-                  <form onSubmit={createLead}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div>
-                        <label className="tiny mut" style={{ display: 'block', marginBottom: 2 }}>Lead name *</label>
-                        <input required placeholder="Full name (e.g. Rahul Sharma)" value={newLead.name}
-                          onChange={(e) => setNewLead({ ...newLead, name: e.target.value })} style={fieldInput} />
-                      </div>
-                      <div>
-                        <label className="tiny mut" style={{ display: 'block', marginBottom: 2 }}>Company name *</label>
-                        <input required placeholder="Company name (e.g. Acme Corp)" value={newLead.company_name}
-                          onChange={(e) => setNewLead({ ...newLead, company_name: e.target.value })} style={fieldInput} />
-                      </div>
-                      <div>
-                        <label className="tiny mut" style={{ display: 'block', marginBottom: 2 }}>Work email</label>
-                        <input type="email" placeholder="user@example.com" value={newLead.email}
-                          onChange={(e) => setNewLead({ ...newLead, email: e.target.value })} style={fieldInput} />
-                      </div>
-                      <div>
-                        <label className="tiny mut" style={{ display: 'block', marginBottom: 2 }}>Phone number</label>
-                        <input type="text" maxLength={10} placeholder="10-digit phone no" value={newLead.phone}
-                          onChange={(e) => setNewLead({ ...newLead, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                          style={fieldInput} />
-                      </div>
-                      <div>
-                        <label className="tiny mut" style={{ display: 'block', marginBottom: 2 }}>Lead source</label>
-                        <select value={newLead.source} onChange={(e) => setNewLead({ ...newLead, source: e.target.value })}
-                          style={{ ...fieldInput, width: '100%', background: 'var(--surface)', cursor: 'pointer' }}>
-                          <option value="manual">manual</option>
-                          <option value="web">web</option>
-                          <option value="referral">referral</option>
-                          <option value="event">event</option>
-                          <option value="partner">partner</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="rowx sp" style={{ marginTop: 12 }}>
-                      <button type="button" className="btn ghost" style={{ padding: '4px 10px' }} onClick={() => setShowNew(false)}>Cancel</button>
-                      <button className="btn pri" style={{ padding: '4px 12px' }}>Create lead ✓</button>
-                    </div>
-                  </form>
-                </div>
-              )}
 
               {leads.map((lead) => (
                 <div
@@ -139,7 +95,7 @@ export default function Leads() {
               ))}
             </div>
 
-            <div style={{ padding: 18 }}>
+            <div className="leads-detail-pane">
               {selected ? (
                 <>
                   <div className="rowx sp" style={{ flexWrap: 'wrap', gap: 10 }}>
@@ -193,8 +149,96 @@ export default function Leads() {
             </div>
           </div>
         </div>
+
+        {showNew && (
+          <div className="lead-modal-overlay" onClick={() => setShowNew(false)}>
+            <div className="lead-modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="lead-modal-header">
+                <div className="lead-modal-title-row">
+                  <div className="lead-modal-icon-badge">👤</div>
+                  <div>
+                    <h3>Add new lead</h3>
+                    <span className="tiny mut">Fill in details to expand your sales pipeline</span>
+                  </div>
+                </div>
+                <button type="button" className="lead-modal-close" onClick={() => setShowNew(false)}>✕</button>
+              </div>
+              <div className="title-bar" style={{ margin: '0 0 22px 0', width: 48, height: 3 }} />
+
+              <form onSubmit={createLead}>
+                <div className="lead-modal-form-grid">
+                  <div>
+                    <label className="lead-modal-label">Lead name *</label>
+                    <input
+                      required
+                      placeholder="Full name (e.g. Rahul Sharma)"
+                      className="lead-modal-input"
+                      value={newLead.name}
+                      onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="lead-modal-label">Company name *</label>
+                    <input
+                      required
+                      placeholder="Company name (e.g. Acme Corp)"
+                      className="lead-modal-input"
+                      value={newLead.company_name}
+                      onChange={(e) => setNewLead({ ...newLead, company_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="lead-modal-label">Work email</label>
+                    <input
+                      type="email"
+                      placeholder="user@example.com"
+                      className="lead-modal-input"
+                      value={newLead.email}
+                      onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="lead-modal-label">Phone number</label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      placeholder="10-digit phone number"
+                      className="lead-modal-input"
+                      value={newLead.phone}
+                      onChange={(e) => setNewLead({ ...newLead, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    />
+                  </div>
+                  <div className="">
+                    <label className="lead-modal-label">Lead source</label>
+                    <CustomSelect
+                      options={[
+                        { value: 'manual', label: 'Manual entry' },
+                        { value: 'web', label: 'Website inquiry' },
+                        { value: 'referral', label: 'Customer referral' },
+                        { value: 'event', label: 'Event / Trade show' },
+                        { value: 'partner', label: 'Partner channel' },
+                      ]}
+                      value={newLead.source}
+                      onChange={(val) => setNewLead({ ...newLead, source: val })}
+                      className="lead-modal-custom-select"
+                    />
+                  </div>
+                </div>
+                <div className="lead-modal-actions">
+                  <button type="button" className="btn ghost lead-modal-cancel-btn" onClick={() => setShowNew(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn pri lead-modal-submit-btn">
+                    Create lead ✓
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
+ 
   )
 }
 

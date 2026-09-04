@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { accountsApi, activitiesApi, opportunitiesApi, quotesApi } from '../api/endpoints'
 import '../styles/ikyam-mock.css'
-import './Record.css'
+import '../styles/Record.css'
 
 const ACTIVITY_TYPES = [
   { type: 'call', label: '☎ Call' },

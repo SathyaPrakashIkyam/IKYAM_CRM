@@ -85,38 +85,68 @@
 .role-mgmt-table-wrap {
   margin-top: 16px;
   overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 1.5px solid var(--line, #EFE4D6);
+  border-radius: 16px;
+  background: var(--surface, #FFFFFF);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .role-mgmt-table-wrap {
+  background: rgba(12, 38, 44, 0.85);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .role-mgmt-table {
   width: 100%;
   border-collapse: collapse;
   min-width: 720px;
+  font: 500 13px var(--b);
 }
 
 .role-mgmt-table thead th {
-  background: var(--brand);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.02);
+  color: var(--mut, #617A84);
   text-align: center;
-  font: 600 10.5px var(--b);
-  letter-spacing: 0.4px;
+  font: 700 11px var(--b);
+  letter-spacing: 0.6px;
   text-transform: uppercase;
-  padding: 10px 8px;
+  padding: 12px 10px;
+  border-bottom: 1.5px solid var(--line, #EFE4D6);
+}
+
+[data-theme="dark"] .role-mgmt-table thead th {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--mut, #8CA5AF);
 }
 
 .role-mgmt-table thead th:first-child {
   text-align: left;
-  padding-left: 14px;
+  padding-left: 16px;
 }
 
 .role-mgmt-table tbody td {
-  border-top: 1px solid var(--line);
-  padding: 9px 8px;
+  border-bottom: 1px solid var(--line, #EFE4D6);
+  padding: 11px 10px;
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+[data-theme="dark"] .role-mgmt-table tbody td {
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink, #E8F1F5);
+}
+
+.role-mgmt-table tbody tr:hover td {
+  background: rgba(0, 201, 167, 0.06);
+}
+
+[data-theme="dark"] .role-mgmt-table tbody tr:hover td {
+  background: rgba(0, 201, 167, 0.1);
 }
 
 .role-mgmt-table tbody td:first-child {
-  padding-left: 14px;
+  padding-left: 16px;
   min-width: 190px;
 }
 

@@ -1,0 +1,390 @@
+/* ==========================================================================
+   Settings Stylesheet — Warm Sand & Glass Theme
+   ========================================================================== */
+
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-page .scr-head {
+  flex-shrink: 0;
+  margin-bottom: 0 !important;
+}
+
+/* Modern Segmented Navigation Tabs */
+.settings-tabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.settings-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: 1.5px solid var(--line, #EFE4D6);
+  background: var(--surface, #FFFFFF);
+  color: var(--mut, #617A84);
+  font: 600 13px var(--b);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings-tab-btn:hover {
+  border-color: #00C9A7;
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.settings-tab-btn.active {
+  background: linear-gradient(90deg, #00C9A7 0%, #0072CE 100%);
+  color: #FFFFFF;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(0, 201, 167, 0.35);
+}
+
+[data-theme="dark"] .settings-tab-btn {
+  background: rgba(12, 38, 44, 0.7);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--mut);
+}
+
+[data-theme="dark"] .settings-tab-btn:hover {
+  border-color: #00C9A7;
+  color: #FFFFFF;
+}
+
+[data-theme="dark"] .settings-tab-btn.active {
+  background: linear-gradient(90deg, #00C9A7 0%, #0072CE 100%);
+  color: #FFFFFF;
+}
+
+/* Scroll Container for Settings Content */
+.settings-content-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-content-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-content-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-content-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 201, 167, 0.35);
+  border-radius: 4px;
+}
+
+[data-theme="dark"] .settings-content-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Frosted Glass Settings Card */
+.settings-card {
+  background: var(--surface, #FFFFFF);
+  border: 1.5px solid var(--line, #EFE4D6);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .settings-card {
+  background: rgba(12, 38, 44, 0.85);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Card Section Header */
+.settings-section-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line, #EFE4D6);
+}
+
+[data-theme="dark"] .settings-section-head {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.settings-section-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(0, 201, 167, 0.12);
+  color: #00A68A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .settings-section-icon {
+  background: rgba(0, 201, 167, 0.2);
+  color: #00C9A7;
+}
+
+.settings-section-title {
+  margin: 0;
+  font: 800 17px/1.2 var(--d);
+  color: var(--ink);
+}
+
+.settings-section-subtitle {
+  margin-top: 3px;
+  font: 500 12.5px var(--b);
+  color: var(--mut);
+}
+
+/* Form Layout Grid */
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.settings-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-form-label {
+  font: 700 11.5px var(--b);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--mut);
+}
+
+.settings-input {
+  height: 42px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line, #EFE4D6);
+  background: var(--surface, #FFFFFF);
+  padding: 0 14px;
+  font: 500 13px var(--b);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.settings-input:focus {
+  border-color: #00C9A7;
+  box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.15);
+}
+
+[data-theme="dark"] .settings-input {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme="dark"] .settings-input:focus {
+  border-color: #00C9A7;
+}
+
+.settings-input:disabled {
+  opacity: 0.65;
+  background: rgba(0, 0, 0, 0.04);
+  cursor: not-allowed;
+}
+
+/* Custom Select in Settings */
+.settings-custom-select {
+  width: 100%;
+}
+
+.settings-custom-select .custom-select-trigger {
+  height: 42px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line, #EFE4D6);
+  background: var(--surface, #FFFFFF);
+}
+
+[data-theme="dark"] .settings-custom-select .custom-select-trigger {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Settings Metrics Strip */
+.settings-metrics-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  padding: 14px 20px;
+  border-radius: 20px;
+  border: 1.5px solid var(--line, #EFE4D6);
+  background: var(--surface, #FFFFFF);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .settings-metrics-strip {
+  background: rgba(12, 38, 44, 0.85);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.settings-metric-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-metric-label {
+  font: 700 11px var(--b);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--mut);
+}
+
+.settings-metric-num {
+  font: 800 22px var(--d);
+  color: var(--ink);
+  margin-top: 3px;
+  line-height: 1.1;
+}
+
+/* Controls Toolbar */
+.settings-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.settings-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 40px;
+  border-radius: 20px;
+  border: 1.5px solid var(--line, #EFE4D6);
+  background: var(--surface, #FFFFFF);
+  min-width: 260px;
+  max-width: 380px;
+  flex: 1;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.settings-search-box:focus-within {
+  border-color: #00C9A7;
+  box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.15);
+}
+
+[data-theme="dark"] .settings-search-box {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.settings-search-input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font: 500 13px var(--b);
+  color: var(--ink);
+}
+
+/* Object Badge Tags */
+.obj-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font: 700 11px var(--b);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.obj-badge.lead {
+  background: rgba(0, 201, 167, 0.14);
+  color: #00876E;
+}
+
+.obj-badge.account {
+  background: rgba(0, 114, 206, 0.14);
+  color: #0060B0;
+}
+
+.obj-badge.contact {
+  background: rgba(139, 92, 246, 0.14);
+  color: #7C3AED;
+}
+
+.obj-badge.opportunity {
+  background: rgba(245, 158, 11, 0.14);
+  color: #D97706;
+}
+
+.obj-badge.quote {
+  background: rgba(236, 72, 153, 0.14);
+  color: #DB2777;
+}
+
+/* AI Key Row */
+.ai-key-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1.5px solid var(--line, #EFE4D6);
+  background: rgba(0, 0, 0, 0.015);
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.ai-key-item:hover {
+  border-color: #00C9A7;
+  background: rgba(0, 201, 167, 0.03);
+}
+
+[data-theme="dark"] .ai-key-item {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .ai-key-item:hover {
+  background: rgba(0, 201, 167, 0.07);
+  border-color: #00C9A7;
+}
+
+/* AI Header Banner */
+.ai-hero-banner {
+  padding: 20px 24px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(0, 201, 167, 0.1) 0%, rgba(0, 114, 206, 0.12) 100%);
+  border: 1.5px solid rgba(0, 201, 167, 0.25);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+[data-theme="dark"] .ai-hero-banner {
+  background: linear-gradient(135deg, rgba(0, 201, 167, 0.15) 0%, rgba(0, 114, 206, 0.18) 100%);
+  border-color: rgba(0, 201, 167, 0.35);
+}

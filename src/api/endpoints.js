@@ -6,7 +6,7 @@ export const authApi = {
   createWorkspace: (body) => api.post('/auth/onboarding/workspace', body).then((r) => r.data),
   createCompany: (body) => api.post('/auth/onboarding/company', body).then((r) => r.data),
   login: (body) => api.post('/user_master/login-authenticate', body).then((r) => r.data),
-  logout: () => api.post('/auth/logout'),
+  logout: () => api.post('/user_master/logout'),
   me: () => api.get('/auth/me').then((r) => r.data),
 }
 

@@ -1,0 +1,173 @@
+/* Today (landing) screen — layout specific to this page only.
+   Palette / AI-frame / ring / etc. come from ../styles/ikyam-mock.css */
+
+.today-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.today-page .scr-head {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.today-page .title-bar {
+  width: 56px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #FF6B35 0%, #00C9A7 100%);
+  margin: 6px 0 8px 0;
+}
+
+.today-page .frame {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1.5px solid rgba(255, 255, 255, 0.98);
+  border-radius: 28px;
+  box-shadow: 0 12px 36px rgba(0, 100, 120, 0.08);
+  overflow: hidden;
+}
+
+[data-theme="dark"] .today-page .frame {
+  background: rgba(12, 38, 44, 0.78);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.55);
+}
+
+.today-scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.today-ai-banner {
+  position: relative;
+  margin-top: 10px;
+  margin-bottom: 22px !important;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(0, 201, 167, 0.08) 0%, rgba(0, 114, 206, 0.06) 100%);
+}
+
+.today-page .kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.today-kpi-card {
+  padding: 18px 22px;
+  border-radius: 22px;
+  background: var(--surface);
+  border: 1.5px solid rgba(0, 201, 167, 0.22);
+  box-shadow: 0 6px 18px rgba(0, 100, 120, 0.05);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.today-kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #00C9A7, #0072CE);
+  opacity: 0.8;
+}
+
+.today-kpi-card:hover {
+  transform: translateY(-3px);
+  border-color: #00C9A7;
+  box-shadow: 0 12px 28px rgba(0, 201, 167, 0.18);
+}
+
+.today-kpi-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 201, 167, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #00C9A7;
+}
+
+.today-cols {
+  grid-template-columns: 1.4fr 1fr;
+}
+
+.today-task-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(0, 201, 167, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: #00C9A7;
+}
+
+.today-task {
+  cursor: pointer;
+  margin-top: 10px;
+  padding: 14px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--line, rgba(0, 201, 167, 0.2));
+  transition: all 0.2s ease;
+}
+
+.today-task:hover {
+  transform: translateX(6px);
+  border-color: #00C9A7;
+  background: rgba(0, 201, 167, 0.08);
+}
+
+.today-quick-link {
+  cursor: pointer;
+  padding: 20px 16px;
+  border-radius: 22px;
+  border: 1px solid var(--line, rgba(0, 201, 167, 0.2));
+  transition: all 0.25s ease;
+  background: var(--surface);
+}
+
+.today-quick-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(0, 201, 167, 0.15) 0%, rgba(0, 114, 206, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: transform 0.25s ease;
+}
+
+.today-quick-link:hover {
+  transform: translateY(-4px);
+  border-color: #00C9A7;
+  box-shadow: 0 10px 24px rgba(0, 201, 167, 0.2);
+  background: rgba(0, 201, 167, 0.06);
+}
+
+.today-quick-link:hover .today-quick-icon {
+  transform: scale(1.1);
+}
+
+@media (max-width: 940px) {
+  .today-page .kpis,
+  .today-cols {
+    grid-template-columns: 1fr;
+  }
+}

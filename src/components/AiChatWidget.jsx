@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { WS_BASE_URL, getAuthToken, currentCompanyId } from '../api/client'
 import ikyamMark from '../assets/ikyam-mark.png'
 import '../styles/ikyam-mock.css'
-import './AiChatWidget.css'
+import '../styles/AiChatWidget.css'
 
 function newSessionId() {
   return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`)

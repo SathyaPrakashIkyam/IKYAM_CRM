@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import AppShell from '../components/AppShell'
 import { rolesApi } from '../api/endpoints'
 import '../styles/ikyam-mock.css'
-import './RoleManagement.css'
+import '../styles/RoleManagement.css'
 
 const ACTION_LABELS = {
   view: 'View',

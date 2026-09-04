@@ -16,6 +16,9 @@ import Contacts from './pages/Contacts'
 import Activities from './pages/Activities'
 import Quotes from './pages/Quotes'
 import Products from './pages/Products'
+import ProductGroups from './pages/ProductGroups'
+import Uoms from './pages/Uoms'
+import Currencies from './pages/Currencies'
 import RoleManagement from './pages/RoleManagement'
 import SyncMonitor from './pages/SyncMonitor'
 import Dashboard from './pages/Dashboard'
@@ -49,6 +52,13 @@ function AppRoutes() {
       <Route path="/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
       <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
       <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+      <Route path="/masters" element={<Navigate to="/product-groups" replace />} />
+      <Route path="/product-groups" element={<ProtectedRoute companyAdminOnly><ProductGroups /></ProtectedRoute>} />
+      <Route path="/masters/product-groups" element={<ProtectedRoute companyAdminOnly><ProductGroups /></ProtectedRoute>} />
+      <Route path="/uoms" element={<ProtectedRoute companyAdminOnly><Uoms /></ProtectedRoute>} />
+      <Route path="/masters/uoms" element={<ProtectedRoute companyAdminOnly><Uoms /></ProtectedRoute>} />
+      <Route path="/currencies" element={<ProtectedRoute companyAdminOnly><Currencies /></ProtectedRoute>} />
+      <Route path="/masters/currencies" element={<ProtectedRoute companyAdminOnly><Currencies /></ProtectedRoute>} />
       <Route path="/roles" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
       <Route path="/sync" element={<ProtectedRoute><SyncMonitor /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

@@ -3,7 +3,7 @@ import AppShell from '../components/AppShell'
 import { reportsApi } from '../api/endpoints'
 import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
-import './Reports.css'
+import '../styles/Reports.css'
 
 const REPORTS = [
   { key: 'pipeline_by_stage', label: 'Pipeline by stage', fetch: reportsApiCall('pipelineByStage') },
@@ -82,25 +82,39 @@ export default function Reports() {
   return (
     <AppShell>
       <div className="ikyam-mock reports-page">
-        <div className="scr-head"><h2>Reports</h2><span className="goal">Pick a report, filter it, and let the AI explain what changed — export or save it for the team.</span></div>
+        <div className="scr-head">
+          <h2>Reports</h2>
+          <div className="title-bar" />
+          <span className="goal">Pick a report, filter it, and let the AI explain what changed — export or save it for the team.</span>
+        </div>
         <div className="frame">
-          <div className="shell reports-shell">
-            <aside className="rail">
+          <div className="reports-split">
+            <aside className="reports-sidebar">
               <div className="nav">
-                <span className="lab" style={{ padding: '0 10px' }}>Standard reports</span>
+                <span className="lab" style={{ padding: '0 10px', marginBottom: 4 }}>Standard reports</span>
                 {REPORTS.map((r) => (
-                  <a key={r.key} href="#" className={active === r.key ? 'sel' : ''}
-                    onClick={(e) => { e.preventDefault(); setActive(r.key) }}>{r.label}</a>
+                  <a
+                    key={r.key}
+                    href="#"
+                    className={active === r.key ? 'sel' : ''}
+                    onClick={(e) => { e.preventDefault(); setActive(r.key) }}
+                  >
+                    {r.label}
+                  </a>
                 ))}
-                <hr />
-                <span className="lab" style={{ padding: '0 10px' }}>My reports</span>
+                <hr style={{ margin: '14px 0', border: 0, borderTop: '1px solid var(--line)' }} />
+                <span className="lab" style={{ padding: '0 10px', marginBottom: 4 }}>My reports</span>
                 {saved.length === 0 && <div className="tiny" style={{ padding: '0 10px', color: 'var(--faint)' }}>None saved yet</div>}
-                {saved.map((s) => <div key={s.id} className="tiny" style={{ padding: '4px 10px' }}>{s.name}</div>)}
+                {saved.map((s) => (
+                  <div key={s.id} className="tiny" style={{ padding: '6px 10px', color: 'var(--ink)' }}>
+                    {s.name}
+                  </div>
+                ))}
               </div>
             </aside>
-            <div className="main">
-              <div className="topbar" style={{ flexWrap: 'wrap', gap: 8 }}>
-                <div className="rowx" style={{ gap: 8 }}>
+            <div className="reports-main">
+              <div className="reports-toolbar">
+                <div className="rowx" style={{ gap: 10 }}>
                   <select className="rpt-select" value={period} onChange={(e) => setPeriod(e.target.value)}>
                     <option value="all_time">All time</option>
                     <option value="this_quarter">This quarter</option>
@@ -111,36 +125,52 @@ export default function Reports() {
                     <option value="mine">Owner: mine</option>
                   </select>
                 </div>
-                <div className="rowx" style={{ gap: 8 }}>
-                  <button className="btn" onClick={exportCsv} disabled={!report || report.rows.length === 0}>Export CSV</button>
-                  <button className="btn pri" onClick={save} disabled={!report}>＋ Save report</button>
+                <div className="rowx" style={{ gap: 10 }}>
+                  <button className="btn ghost" onClick={exportCsv} disabled={!report || report.rows.length === 0}>
+                    Export CSV
+                  </button>
+                  <button className="btn pri" onClick={save} disabled={!report}>
+                    ＋ Save report
+                  </button>
                 </div>
               </div>
-              <div className="content">
+              <div className="reports-content">
                 {report && (
                   <>
-                    <b style={{ font: '600 15px var(--d)' }}>{report.name}</b>
+                    <b style={{ font: '600 16px var(--d)', color: 'var(--ink)' }}>{report.name}</b>
                     {report.subtitle && <div className="tiny mut" style={{ marginTop: 2 }}>{report.subtitle}</div>}
-                    <table className="qtable" style={{ marginTop: 8 }}>
-                      <thead><tr>{report.columns.map((c) => <th key={c}>{COLUMN_LABELS[c] || c}</th>)}</tr></thead>
-                      <tbody>
-                        {report.rows.map((row, i) => (
-                          <tr key={i}>
-                            {report.columns.map((c) => <td key={c}>{formatCell(c, row[c])}</td>)}
+                    <div className="table-responsive table-card" style={{ marginTop: 12 }}>
+                      <table className="qtable">
+                        <thead>
+                          <tr>
+                            {report.columns.map((c) => (
+                              <th key={c}>{COLUMN_LABELS[c] || c}</th>
+                            ))}
                           </tr>
-                        ))}
-                        {report.rows.length === 0 && (
-                          <tr><td colSpan={report.columns.length} className="tiny mut">No data for this filter.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                    <div className="ai-frame" style={{ padding: 13, marginTop: 13 }}>
-                      <span className="ai-tag">INSIGHT</span>
-                      <div className="tiny" style={{ marginTop: 4 }}>{report.ai_insight}</div>
+                        </thead>
+                        <tbody>
+                          {report.rows.map((row, i) => (
+                            <tr key={i}>
+                              {report.columns.map((c) => (
+                                <td key={c}>{formatCell(c, row[c])}</td>
+                              ))}
+                            </tr>
+                          ))}
+                          {report.rows.length === 0 && (
+                            <tr>
+                              <td colSpan={report.columns.length} className="tiny mut">No data for this filter.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="ai-frame" style={{ padding: 16, marginTop: 16 }}>
+                      <span className="ai-tag">AI INSIGHT</span>
+                      <div className="tiny" style={{ marginTop: 6, lineHeight: 1.6, color: 'var(--ink)' }}>{report.ai_insight}</div>
                     </div>
                   </>
                 )}
-                {!report && <div className="tiny">Loading…</div>}
+                {!report && <div className="tiny">Loading report data…</div>}
               </div>
             </div>
           </div>

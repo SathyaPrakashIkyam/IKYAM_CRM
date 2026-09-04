@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import AppShell from '../components/AppShell'
 import { syncApi } from '../api/endpoints'
 import '../styles/ikyam-mock.css'
-import './SyncMonitor.css'
+import '../styles/SyncMonitor.css'
 
 function timeAgo(iso) {
   if (!iso) return null
@@ -200,19 +200,21 @@ function FieldMappingsModal({ onClose }) {
         {mappings === null && <div className="tiny">Loading…</div>}
         {mappings && mappings.length === 0 && <div className="tiny mut">No field mappings configured for this connection yet.</div>}
         {mappings && mappings.length > 0 && (
-          <table className="qtable">
-            <thead><tr><th>Object</th><th>CRM field</th><th>SAP field</th><th>System of record</th></tr></thead>
-            <tbody>
-              {mappings.map((m) => (
-                <tr key={m.id}>
-                  <td>{m.object_type} → {m.erp_object}</td>
-                  <td className="mono">{m.crm_field}</td>
-                  <td className="mono">{m.erp_field}</td>
-                  <td><span className="chip">{m.system_of_record}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-card" style={{ marginTop: 10 }}>
+            <table className="qtable">
+              <thead><tr><th>Object</th><th>CRM field</th><th>SAP field</th><th>System of record</th></tr></thead>
+              <tbody>
+                {mappings.map((m) => (
+                  <tr key={m.id}>
+                    <td>{m.object_type} → {m.erp_object}</td>
+                    <td className="mono">{m.crm_field}</td>
+                    <td className="mono">{m.erp_field}</td>
+                    <td><span className="chip">{m.system_of_record}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         <div className="rowx" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
           <button type="button" className="btn ghost" onClick={onClose}>Close</button>

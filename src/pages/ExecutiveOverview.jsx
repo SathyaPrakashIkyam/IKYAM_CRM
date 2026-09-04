@@ -4,7 +4,7 @@ import AppShell from '../components/AppShell'
 import { dashboardApi, opportunitiesApi } from '../api/endpoints'
 import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
-import './ExecutiveOverview.css'
+import '../styles/ExecutiveOverview.css'
 
 const STRIP_COLORS = ['var(--line2)', 'var(--amber)', 'var(--orange)', 'var(--green)', 'var(--primary)']
 

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import AppShell from '../components/AppShell'
+import CustomSelect from '../components/CustomSelect'
 import { activitiesApi } from '../api/endpoints'
 import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
-import './Activities.css'
+import '../styles/Activities.css'
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -12,11 +13,18 @@ const FILTERS = [
   { key: 'meeting', label: '▤ Meetings' },
 ]
 
+const ACTIVITY_TYPE_OPTIONS = [
+  { value: 'call', label: '☎ Phone Call' },
+  { value: 'task', label: '✓ Task' },
+  { value: 'meeting', label: '📅 Meeting' },
+  { value: 'email', label: '✉ Email' },
+]
+
 export default function Activities() {
   const [activities, setActivities] = useState([])
   const [filter, setFilter] = useState('all')
   const [showNew, setShowNew] = useState(false)
-  const [form, setForm] = useState({ activity_type: 'call', subject: '' })
+  const [form, setForm] = useState({ activity_type: 'call', subject: '', due_at: '' })
   const companyId = currentCompanyId()
 
   function load() {
@@ -29,7 +37,7 @@ export default function Activities() {
   async function createActivity(e) {
     e.preventDefault()
     await activitiesApi.create(companyId, form)
-    setForm({ activity_type: 'call', subject: '' })
+    setForm({ activity_type: 'call', subject: '', due_at: '' })
     setShowNew(false)
     load()
   }
@@ -46,75 +54,192 @@ export default function Activities() {
   return (
     <AppShell>
       <div className="ikyam-mock activities-page">
-        <div className="scr-head"><h2>Activities</h2><span className="goal">Every call, task, and meeting — one queue, not scattered across records.</span></div>
+        <div className="scr-head" style={{ marginBottom: 16 }}>
+          <div className="rowx sp" style={{ flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            <div>
+              <h2 style={{ font: '800 24px/1.2 var(--d)', letterSpacing: '-0.4px', color: 'var(--ink)' }}>
+                Activities
+              </h2>
+              <div className="goal" style={{ marginTop: 2 }}>
+                Every call, task, and meeting — one unified queue across all records
+              </div>
+            </div>
+            <button className="btn pri activities-new-btn" onClick={() => setShowNew(true)}>
+              ＋ New activity
+            </button>
+          </div>
+          <div className="title-bar" style={{ margin: '10px 0 16px 0' }} />
+        </div>
 
         <div className="rowx sp activities-toolbar">
-          <div className="rowx">
+          <div className="rowx" style={{ gap: 8 }}>
             {FILTERS.map((f) => (
-              <span key={f.key} className={`chip actchip ${filter === f.key ? 'on' : ''}`} onClick={() => setFilter(f.key)}>{f.label}</span>
+              <span
+                key={f.key}
+                className={`actchip ${filter === f.key ? 'on' : ''}`}
+                onClick={() => setFilter(f.key)}
+              >
+                {f.label}
+              </span>
             ))}
           </div>
-          <button className="btn pri" onClick={() => setShowNew((v) => !v)}>＋ New activity</button>
+          <span className="tiny mut">{activities.length} total activities</span>
+        </div>
+
+        <div className="frame activities-main-frame">
+          <div className="activities-scroll-pane">
+            <ActivitySection
+              title="Overdue"
+              badgeText={`${overdue.length} requiring immediate action`}
+              items={overdue}
+              onComplete={complete}
+              tone="risk"
+            />
+            <ActivitySection
+              title="Today & Open"
+              badgeText={`${open.length} pending`}
+              items={open}
+              onComplete={complete}
+            />
+            <ActivitySection
+              title="Completed"
+              badgeText={`${done.length} finished`}
+              items={done}
+              onComplete={complete}
+              isDone
+            />
+            {activities.length === 0 && (
+              <div className="activities-empty-state">
+                <div className="activities-empty-icon">⚡</div>
+                <b>No activities found</b>
+                <p className="tiny mut">Create a new call, meeting, or task to start tracking your queue.</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {showNew && (
-          <div className="card" style={{ marginBottom: 14 }}>
-            <form onSubmit={createActivity}>
-              <div className="grid" style={{ gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-                <select value={form.activity_type} onChange={(e) => setForm({ ...form, activity_type: e.target.value })} style={fieldInput}>
-                  <option value="call">Call</option>
-                  <option value="task">Task</option>
-                  <option value="meeting">Meeting</option>
-                  <option value="email">Email</option>
-                </select>
-                <input required placeholder="Subject" value={form.subject}
-                  onChange={(e) => setForm({ ...form, subject: e.target.value })} style={fieldInput} />
+          <div className="lead-modal-overlay" onClick={() => setShowNew(false)}>
+            <div className="lead-modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="lead-modal-header">
+                <div className="lead-modal-title-row">
+                  <div className="lead-modal-icon-badge">⚡</div>
+                  <div>
+                    <h3>Create new activity</h3>
+                    <span className="tiny mut">Schedule a call, meeting, task, or follow-up</span>
+                  </div>
+                </div>
+                <button type="button" className="lead-modal-close" onClick={() => setShowNew(false)}>✕</button>
               </div>
-              <div className="rowx sp" style={{ marginTop: 9 }}>
-                <span />
-                <span className="rowx">
-                  <button type="button" className="btn ghost" onClick={() => setShowNew(false)}>Cancel</button>
-                  <button className="btn pri">Add to queue</button>
-                </span>
-              </div>
-            </form>
+              <div className="title-bar" style={{ margin: '0 0 20px 0', width: 44, height: 3 }} />
+
+              <form onSubmit={createActivity}>
+                <div className="lead-modal-form-grid">
+                  <div>
+                    <label className="lead-modal-label">Activity type *</label>
+                    <CustomSelect
+                      options={ACTIVITY_TYPE_OPTIONS}
+                      value={form.activity_type}
+                      onChange={(val) => setForm({ ...form, activity_type: val })}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="lead-modal-label">Due Date</label>
+                    <input
+                      type="date"
+                      className="lead-modal-input"
+                      value={form.due_at || ''}
+                      onChange={(e) => setForm({ ...form, due_at: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="lead-modal-full-width">
+                    <label className="lead-modal-label">Subject / Description *</label>
+                    <input
+                      required
+                      placeholder="e.g. Follow up call regarding Q3 pricing proposal"
+                      className="lead-modal-input"
+                      value={form.subject}
+                      onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="lead-modal-actions">
+                  <button type="button" className="btn ghost lead-modal-cancel-btn" onClick={() => setShowNew(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn pri lead-modal-submit-btn">
+                    Add to queue →
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
-
-        <ActivitySection title="Overdue" items={overdue} onComplete={complete} tone="risk" />
-        <ActivitySection title="Today & open" items={open} onComplete={complete} />
-        <ActivitySection title="Completed" items={done} onComplete={complete} />
       </div>
     </AppShell>
   )
 }
 
-function ActivitySection({ title, items, onComplete, tone }) {
+function ActivitySection({ title, badgeText, items, onComplete, tone, isDone }) {
   if (items.length === 0) return null
   return (
-    <>
-      <div className="lab" style={{ marginTop: 16, color: tone === 'risk' ? 'var(--orange-ink)' : undefined }}>{title}</div>
-      {items.map((a) => (
-        <div className="card hov" key={a.id} style={{ marginTop: 8, padding: '10px 12px' }}>
-          <div className="rowx sp">
-            <div className="rowx">
-              <span className="dot" style={{ cursor: a.status === 'open' ? 'pointer' : 'default' }} onClick={() => a.status === 'open' && onComplete(a.id)}>
-                {{ call: '☎', task: '✓', meeting: '▤', email: '✉' }[a.activity_type] || '•'}
-              </span>
-              <div>
-                <b style={{ fontSize: 12.5, textDecoration: a.status === 'completed' ? 'line-through' : 'none' }}>{a.subject}</b>
-                <div className="tiny">{a.activity_type}</div>
+    <div className="activity-section">
+      <div className="activity-section-header">
+        <span className={`activity-section-title ${tone === 'risk' ? 'risk' : ''}`}>{title}</span>
+        <span className={`activity-section-badge ${tone === 'risk' ? 'risk' : ''}`}>{badgeText}</span>
+      </div>
+      <div className="activity-cards-list">
+        {items.map((a) => (
+          <div className={`card hov activity-card ${isDone ? 'done' : ''}`} key={a.id}>
+            <div className="rowx sp" style={{ width: '100%' }}>
+              <div className="rowx" style={{ gap: 14 }}>
+                <span
+                  className="activity-icon-badge"
+                  style={{ cursor: a.status === 'open' ? 'pointer' : 'default' }}
+                  onClick={() => a.status === 'open' && onComplete(a.id)}
+                  title={a.status === 'open' ? 'Click to complete' : 'Completed'}
+                >
+                  {typeIcon(a.activity_type)}
+                </span>
+                <div>
+                  <b className={`activity-subject ${a.status === 'completed' ? 'completed' : ''}`}>
+                    {a.subject}
+                  </b>
+                  <div className="rowx" style={{ gap: 8, marginTop: 3 }}>
+                    <span className="tiny mut" style={{ textTransform: 'capitalize' }}>{a.activity_type}</span>
+                    {a.entity_type && <span className="tiny mut">· {a.entity_type}</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rowx" style={{ gap: 10 }}>
+                {a.due_at && (
+                  <span className={`chip ${tone === 'risk' ? 'danger' : 'warn'}`}>
+                    {new Date(a.due_at).toLocaleDateString()}
+                  </span>
+                )}
+                {a.status === 'open' && (
+                  <button
+                    type="button"
+                    className="activity-complete-btn"
+                    onClick={() => onComplete(a.id)}
+                  >
+                    ✓ Complete
+                  </button>
+                )}
               </div>
             </div>
-            {a.due_at && <span className="chip warn">{new Date(a.due_at).toLocaleDateString()}</span>}
           </div>
-        </div>
-      ))}
-    </>
+        ))}
+      </div>
+    </div>
   )
 }
 
-const fieldInput = {
-  padding: '7px 9px', border: '1px solid var(--line)', borderRadius: 8,
-  background: 'var(--surface)', color: 'var(--ink)', font: '500 12.5px var(--b)',
+function typeIcon(type) {
+  return { call: '☎', task: '✓', meeting: '📅', email: '✉' }[type] || '⚡'
 }

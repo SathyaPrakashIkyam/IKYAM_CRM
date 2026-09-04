@@ -179,7 +179,8 @@ export default function OnboardingList() {
             No onboarding records found.
           </div>
         ) : (
-          <table className="qtable">
+          <div className="table-card">
+            <table className="qtable">
             <thead>
               <tr>
                 <th> Company Name</th>
@@ -284,7 +285,8 @@ export default function OnboardingList() {
               })}
             </tbody>
           </table>
-        )}
+        </div>
+      )}
       </div>
 
       {/* Approval Confirmation Warning Dialog */}
