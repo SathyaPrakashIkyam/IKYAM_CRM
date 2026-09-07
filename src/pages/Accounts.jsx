@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { accountsApi } from '../api/endpoints'
@@ -29,17 +29,20 @@ export default function Accounts() {
   const [searchQuery, setSearchQuery] = useState('')
   const [newAccount, setNewAccount] = useState({ name: '', industry: '' })
   const navigate = useNavigate()
+  const location = useLocation()
   const companyId = currentCompanyId()
 
   function load() {
     if (!companyId) return
     accountsApi.list(companyId).then((data) => {
       setAccounts(data)
-      if (data.length && !selected) select(data[0])
+      const openId = location.state?.openId
+      const toSelect = (openId && data.find((a) => a.id === openId)) || (data.length && !selected ? data[0] : null)
+      if (toSelect) select(toSelect)
     })
   }
 
-  useEffect(load, [companyId])
+  useEffect(load, [companyId, location.state])
 
   function select(account) {
     setSelected(account)

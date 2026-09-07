@@ -61,6 +61,7 @@ export const leadsApi = {
   list: (companyId, statusFilter) =>
     api.get('/leads', { params: { company_id: companyId, status_filter: statusFilter } }).then((r) => r.data),
   create: (companyId, body) => api.post('/leads', body, { params: { company_id: companyId } }).then((r) => r.data),
+  update: (companyId, id, body) => api.put(`/leads/${id}`, body, { params: { company_id: companyId } }).then((r) => r.data),
   get: (id) => api.get(`/leads/${id}`).then((r) => r.data),
   disqualify: (id, reason) => api.post(`/leads/${id}/disqualify`, { reason }).then((r) => r.data),
   convert: (id, body) => api.post(`/leads/${id}/convert`, body || {}).then((r) => r.data),

@@ -12,6 +12,14 @@ export default function Onboarding() {
   const location = useLocation()
 
   const [saving, setSaving] = useState(false)
+  const [approving, setApproving] = useState(false)
+  const [showConfirmApprove, setShowConfirmApprove] = useState(false)
+  const [modalState, setModalState] = useState({
+    open: false,
+    title: '',
+    message: '',
+    type: 'success',
+  })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -145,7 +153,7 @@ export default function Onboarding() {
         } else {
           navigate('/login')
         }
-      }, 1500)
+      }, 500)
     } catch (err) {
       console.error('Failed to submit onboarding:', err)
       const detail = err.response?.data?.detail
@@ -156,6 +164,40 @@ export default function Onboarding() {
       setError(errMsg)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function executeApprove() {
+    const onboardingId = form.onboard_company_id
+    if (!onboardingId) return
+
+    setApproving(true)
+    setError('')
+    try {
+      await onboardingApi.approveCompanyDetails(onboardingId)
+      setForm((prev) => ({ ...prev, is_approved: true, is_active: true }))
+      setShowConfirmApprove(false)
+      setModalState({
+        open: true,
+        title: 'Approval Successful',
+        message: `Company "${form.company_name || onboardingId}" has been successfully approved and activated.`,
+        type: 'success',
+      })
+    } catch (err) {
+      console.error('Failed to approve company:', err)
+      const msg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        'Approval request failed'
+      setShowConfirmApprove(false)
+      setModalState({
+        open: true,
+        title: 'Approval Failed',
+        message: typeof msg === 'string' ? msg : JSON.stringify(msg),
+        type: 'error',
+      })
+    } finally {
+      setApproving(false)
     }
   }
 
@@ -176,9 +218,56 @@ export default function Onboarding() {
             </p>
           </div>
           {isEditMode && (
-            <span className="chip brand" style={{ fontSize: 13, padding: '4px 12px' }}>
-              Editing #{form.onboard_company_id}
-            </span>
+            <div className="rowx" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {form.is_approved ? (
+                <span className="chip ok" style={{ fontSize: 13, padding: '5px 12px' }}>
+                  ✓ Approved & Active
+                </span>
+              ) : isSuperAdmin ? (
+                <button
+                  type="button"
+                  className="btn pri"
+                  disabled={approving || saving}
+                  style={{
+                    background: 'var(--green)',
+                    borderColor: 'var(--green)',
+                    color: '#fff',
+                    padding: '5px 14px',
+                    fontSize: 12.5,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                  onClick={() => setShowConfirmApprove(true)}
+                >
+                  {approving ? (
+                    <>
+                      <span
+                        className="onboarding-spinner"
+                        style={{
+                          width: 12,
+                          height: 12,
+                          border: '2px solid rgba(255,255,255,0.35)',
+                          borderTopColor: '#ffffff',
+                          borderRadius: '50%',
+                          display: 'inline-block',
+                        }}
+                      />
+                      <span>Approving…</span>
+                    </>
+                  ) : (
+                    '✓ Approve Company'
+                  )}
+                </button>
+              ) : (
+                <span className="chip warn" style={{ fontSize: 13, padding: '5px 12px' }}>
+                  Pending Approval
+                </span>
+              )}
+              <span className="chip brand" style={{ fontSize: 13, padding: '5px 12px' }}>
+                Editing #{form.onboard_company_id}
+              </span>
+            </div>
           )}
         </div>
 
@@ -719,31 +808,69 @@ export default function Onboarding() {
             </div>
           </div> */}
 
-          <div className="rowx sp" style={{ marginTop: 24 }}>
+          <div className="rowx sp" style={{ marginTop: 24, gap: 10, flexWrap: 'wrap' }}>
             {isSuperAdmin && (
               <button
                 type="button"
                 className="btn ghost"
+                disabled={saving || approving}
                 onClick={() => navigate('/onboarding-list')}
               >
                 ← Back to List
               </button>
             )}
-            <button
-              type="submit"
-              className="onboarding-submit-btn"
-              disabled={saving}
-              style={{ padding: '12px 28px', marginLeft: 'auto' }}
-            >
-              {saving ? (
-                <>
-                  <span className="onboarding-spinner" />
-                  <span>{isEditMode ? 'Updating details…' : 'Submitting details…'}</span>
-                </>
-              ) : (
-                <span>{isEditMode ? 'Update Onboarding Details ✓' : 'Submit Onboarding Details ✓'}</span>
+            <div className="rowx" style={{ marginLeft: 'auto', gap: 10 }}>
+              {isEditMode && isSuperAdmin && !form.is_approved && (
+                <button
+                  type="button"
+                  className="btn pri"
+                  disabled={saving || approving}
+                  style={{
+                    background: 'var(--green)',
+                    borderColor: 'var(--green)',
+                    color: '#fff',
+                    padding: '12px 22px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                  onClick={() => setShowConfirmApprove(true)}
+                >
+                  {approving ? (
+                    <>
+                      <span
+                        className="onboarding-spinner"
+                        style={{
+                          width: 14,
+                          height: 14,
+                          border: '2px solid rgba(255,255,255,0.35)',
+                          borderTopColor: '#ffffff',
+                          borderRadius: '50%',
+                        }}
+                      />
+                      <span>Approving Company…</span>
+                    </>
+                  ) : (
+                    '✓ Approve Company'
+                  )}
+                </button>
               )}
-            </button>
+              <button
+                type="submit"
+                className="onboarding-submit-btn"
+                disabled={saving || approving}
+                style={{ padding: '12px 28px' }}
+              >
+                {saving ? (
+                  <>
+                    <span className="onboarding-spinner" />
+                    <span>{isEditMode ? 'Updating details…' : 'Submitting details…'}</span>
+                  </>
+                ) : (
+                  <span>{isEditMode ? 'Update Onboarding Details ✓' : 'Submit Onboarding Details ✓'}</span>
+                )}
+              </button>
+            </div>
           </div>
 
           {!auth && (
@@ -759,10 +886,365 @@ export default function Onboarding() {
     </div>
   )
 
+  const modals = (
+    <>
+      {/* Full-Screen Loading Overlay when saving */}
+      {saving && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface)',
+              border: '1.5px solid var(--line)',
+              borderRadius: 20,
+              padding: '28px 36px',
+              maxWidth: 440,
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: 'var(--shadow-lift), 0 24px 64px rgba(0,0,0,0.25)',
+              animation: 'onboardingFadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+              <span
+                className="onboarding-spinner"
+                style={{
+                  width: 34,
+                  height: 34,
+                  border: '3px solid rgba(0, 114, 206, 0.2)',
+                  borderTopColor: 'var(--primary)',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                }}
+              />
+            </div>
+            <h3 style={{ font: '700 17px var(--d)', color: 'var(--ink)', margin: '0 0 6px' }}>
+              {isEditMode ? 'Updating Onboarding Details…' : 'Submitting Onboarding Details…'}
+            </h3>
+            <p className="tiny mut" style={{ margin: 0, lineHeight: 1.5 }}>
+              {logoFile
+                ? 'Uploading company logo and saving tenant configuration. Please wait…'
+                : 'Saving company details and credentials. Please wait…'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Approval Confirmation Warning Dialog */}
+      {showConfirmApprove && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={() => {
+            if (!approving) setShowConfirmApprove(false)
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface)',
+              border: `1.5px solid ${approving ? 'var(--primary)' : 'var(--amber)'}`,
+              borderRadius: 20,
+              padding: '28px 32px',
+              maxWidth: 480,
+              width: '100%',
+              boxShadow: 'var(--shadow-lift), 0 24px 64px rgba(0,0,0,0.25)',
+              animation: 'onboardingFadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="rowx" style={{ gap: 12, marginBottom: 14 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '50%',
+                  background: approving ? 'var(--primary-soft)' : 'var(--amber-soft)',
+                  color: approving ? 'var(--primary)' : 'var(--amber-ink)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+              >
+                {approving ? (
+                  <span
+                    className="onboarding-spinner"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      border: '2px solid rgba(0, 114, 206, 0.25)',
+                      borderTopColor: 'var(--primary)',
+                      borderRadius: '50%',
+                      display: 'inline-block',
+                    }}
+                  />
+                ) : (
+                  '❓'
+                )}
+              </div>
+              <div>
+                <h3 style={{ font: '700 17px var(--d)', color: 'var(--ink)', margin: 0 }}>
+                  {approving ? 'Approving Company Workspace…' : 'Confirm Company Approval'}
+                </h3>
+                <span className="tiny mut">
+                  {approving ? 'Please wait while workspace setup completes' : 'Action confirmation'}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ font: '400 13.5px var(--b)', color: 'var(--ink)', lineHeight: 1.5, marginBottom: approving ? 16 : 22 }}>
+              {approving ? (
+                <>
+                  Approving company <b style={{ color: 'var(--primary)' }}>"{form.company_name || form.onboard_company_id}"</b>.
+                  Setting up tenant database schema and activating workspace access…
+                </>
+              ) : (
+                <>
+                  Are you sure you want to approve company{' '}
+                  <b style={{ color: 'var(--primary)' }}>
+                    "{form.company_name || form.onboard_company_id}"
+                  </b>
+                  {form.onboard_company_id ? ` (${form.onboard_company_id})` : ''}? This will approve the tenant request and activate company workspace access.
+                </>
+              )}
+            </p>
+
+            {approving && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 14px',
+                  marginBottom: 20,
+                  borderRadius: 10,
+                  background: 'var(--surface2)',
+                  border: '1px solid var(--line)',
+                  fontSize: 13,
+                  color: 'var(--ink)',
+                }}
+              >
+                <span
+                  className="onboarding-spinner"
+                  style={{
+                    width: 16,
+                    height: 16,
+                    border: '2px solid rgba(0, 114, 206, 0.25)',
+                    borderTopColor: 'var(--primary)',
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    flexShrink: 0,
+                  }}
+                />
+                <span>Provisioning workspace & database schema. This may take a few seconds…</span>
+              </div>
+            )}
+
+            <div className="rowx" style={{ justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={approving}
+                onClick={() => setShowConfirmApprove(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn pri"
+                disabled={approving}
+                style={{
+                  background: 'var(--green)',
+                  borderColor: 'var(--green)',
+                  color: '#fff',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  opacity: approving ? 0.85 : 1,
+                  cursor: approving ? 'not-allowed' : 'pointer',
+                }}
+                onClick={executeApprove}
+              >
+                {approving ? (
+                  <>
+                    <span
+                      className="onboarding-spinner"
+                      style={{
+                        width: 14,
+                        height: 14,
+                        border: '2px solid rgba(255, 255, 255, 0.35)',
+                        borderTopColor: '#ffffff',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                      }}
+                    />
+                    <span>Approving…</span>
+                  </>
+                ) : (
+                  '✓ Yes, Approve Company'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fallback Approving Overlay */}
+      {approving && !showConfirmApprove && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface)',
+              border: '1.5px solid var(--line)',
+              borderRadius: 20,
+              padding: '28px 36px',
+              maxWidth: 420,
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: 'var(--shadow-lift), 0 24px 64px rgba(0,0,0,0.25)',
+              animation: 'onboardingFadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+              <span
+                className="onboarding-spinner"
+                style={{
+                  width: 32,
+                  height: 32,
+                  border: '3px solid rgba(0, 114, 206, 0.2)',
+                  borderTopColor: 'var(--primary)',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                }}
+              />
+            </div>
+            <h3 style={{ font: '700 17px var(--d)', color: 'var(--ink)', margin: '0 0 6px' }}>
+              Approving Company Workspace…
+            </h3>
+            <p className="tiny mut" style={{ margin: 0, lineHeight: 1.5 }}>
+              Provisioning database schema and activating company access. Please wait…
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {modalState.open && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={() => setModalState((m) => ({ ...m, open: false }))}
+        >
+          <div
+            style={{
+              background: 'var(--surface)',
+              border: `1.5px solid ${modalState.type === 'error' ? 'rgba(225, 74, 14, 0.4)' : 'var(--green)'}`,
+              borderRadius: 20,
+              padding: '28px 32px',
+              maxWidth: 520,
+              width: '100%',
+              boxShadow: 'var(--shadow-lift), 0 24px 64px rgba(0,0,0,0.25)',
+              animation: 'onboardingFadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="rowx" style={{ gap: 12, marginBottom: 14 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '50%',
+                  background: modalState.type === 'error' ? 'var(--orange-soft)' : 'var(--green-soft)',
+                  color: modalState.type === 'error' ? 'var(--orange-ink)' : 'var(--green-ink)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+              >
+                {modalState.type === 'error' ? '⚠️' : '✓'}
+              </div>
+              <div>
+                <h3 style={{ font: '700 17px var(--d)', color: 'var(--ink)', margin: 0 }}>
+                  {modalState.title}
+                </h3>
+                <span className="tiny mut">Notification alert</span>
+              </div>
+            </div>
+
+            <p style={{ font: '400 13.5px var(--b)', color: 'var(--ink)', lineHeight: 1.5, marginBottom: 22 }}>
+              {modalState.message}
+            </p>
+
+            <div className="rowx" style={{ justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setModalState((m) => ({ ...m, open: false }))}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+
   if (auth) {
     return (
       <AppShell>
         <div style={{ padding: '10px 0' }}>{formContent}</div>
+        {modals}
       </AppShell>
     )
   }
@@ -775,6 +1257,7 @@ export default function Onboarding() {
         <div className="onboarding-grid-pattern" />
       </div>
       {formContent}
+      {modals}
     </div>
   )
 }

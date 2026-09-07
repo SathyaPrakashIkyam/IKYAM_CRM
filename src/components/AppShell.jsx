@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import ikyamLogo from '../assets/ikyam-relatepro-logo.png'
 import ikyamLogoDark from '../assets/Ikyam_RelatePro_WH_BG.png'
-import { notificationsApi } from '../api/endpoints'
+import { notificationsApi, leadsApi, accountsApi, contactsApi, quotesApi, reportsApi } from '../api/endpoints'
 import AiChatWidget from './AiChatWidget'
 import '../styles/ikyam-mock.css'
+
+function matchesQuery(haystacks, q) {
+  return haystacks.some((h) => h && String(h).toLowerCase().includes(q))
+}
 
 // One real nav list for every non-Super-Admin role — `module` is the exact
 // Role Management module_code that gates it. `module: null` means "always
@@ -86,6 +90,79 @@ export default function AppShell({ children, aiPanel }) {
   })
   const [notifs, setNotifs] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
+
+  // Global search: fetch each searchable module's list once (only for modules
+  // this user can view), then filter client-side as they type. Avoids an API
+  // round-trip per keystroke while still searching real, current records.
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchData, setSearchData] = useState({ leads: [], accounts: [], contacts: [], quotes: [], reports: [] })
+  const searchBoxRef = useRef(null)
+
+  useEffect(() => {
+    if (!companyId || isSuperAdmin) return
+    if (can('LEADS', 'view')) leadsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, leads: d }))).catch(() => {})
+    if (can('ACCOUNTS', 'view')) accountsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, accounts: d }))).catch(() => {})
+    if (can('CONTACTS', 'view')) contactsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, contacts: d }))).catch(() => {})
+    if (can('QUOTES', 'view')) quotesApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, quotes: d }))).catch(() => {})
+    if (can('REPORTS', 'view')) reportsApi.saved().then((d) => setSearchData((s) => ({ ...s, reports: d }))).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, isSuperAdmin])
+
+  useEffect(() => {
+    if (!searchOpen) return
+    const close = (e) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setSearchOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [searchOpen])
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return []
+    const groups = []
+
+    const leadMatches = searchData.leads
+      .filter((l) => matchesQuery([l.name, l.lead_no, l.company_name, l.email, l.phone], q))
+      .slice(0, 5)
+      .map((l) => ({ id: l.id, title: l.name, subtitle: `${l.lead_no} · ${l.company_name || 'no company'}`, to: '/leads' }))
+    if (leadMatches.length) groups.push({ label: 'Leads', items: leadMatches })
+
+    const accountMatches = searchData.accounts
+      .filter((a) => matchesQuery([a.name, a.account_no, a.industry, a.phone], q))
+      .slice(0, 5)
+      .map((a) => ({ id: a.id, title: a.name, subtitle: a.industry || a.account_no, to: '/accounts' }))
+    if (accountMatches.length) groups.push({ label: 'Accounts', items: accountMatches })
+
+    const contactMatches = searchData.contacts
+      .filter((c) => matchesQuery([c.first_name, c.last_name, c.title, c.primary_email, c.primary_phone], q))
+      .slice(0, 5)
+      .map((c) => ({ id: c.id, title: c.first_name ? `${c.first_name} ${c.last_name}` : c.last_name, subtitle: c.title || c.primary_email || '—', to: '/contacts' }))
+    if (contactMatches.length) groups.push({ label: 'Contacts', items: contactMatches })
+
+    const quoteMatches = searchData.quotes
+      .filter((qt) => matchesQuery([qt.quote_no, qt.name, qt.status], q))
+      .slice(0, 5)
+      .map((qt) => ({ id: qt.id, title: qt.quote_no || qt.name, subtitle: qt.status || '—', to: '/quotes' }))
+    if (quoteMatches.length) groups.push({ label: 'Quotes', items: quoteMatches })
+
+    const reportMatches = (searchData.reports || [])
+      .filter((r) => matchesQuery([r.name, r.report_type], q))
+      .slice(0, 5)
+      .map((r) => ({ id: r.id, title: r.name, subtitle: r.report_type || 'Saved report', to: '/reports' }))
+    if (reportMatches.length) groups.push({ label: 'Reports', items: reportMatches })
+
+    return groups
+  }, [searchQuery, searchData])
+
+  const hasSearchResults = searchResults.some((g) => g.items.length)
+
+  function goToSearchResult(item) {
+    setSearchOpen(false)
+    setSearchQuery('')
+    navigate(item.to, { state: { openId: item.id } })
+  }
 
   // Every role now shares the same Ikyam mockup palette on the shell — super
   // admin's Onboarding screens were the last holdout on the old plain look.
@@ -288,14 +365,65 @@ export default function AppShell({ children, aiPanel }) {
 
       <div className="main">
         <div className="topbar">
-          <div className="search">
+          <div className="search" ref={searchBoxRef} style={{ position: 'relative' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--mut)' }}>
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
-            <span style={{ fontSize: 13, color: 'var(--mut)', flex: 1 }}>Search leads, accounts, quotes, reports…</span>
-            {isStandardUser && (
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true) }}
+              onFocus={() => searchQuery && setSearchOpen(true)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); e.target.blur() } }}
+              placeholder="Search leads, accounts, quotes, reports…"
+              style={{
+                flex: 1, border: 'none', outline: 'none', background: 'transparent',
+                fontSize: 13, color: 'var(--ink)', font: '500 13px var(--b, inherit)',
+              }}
+            />
+            {searchQuery && (
+              <span
+                style={{ cursor: 'pointer', color: 'var(--mut)', fontSize: 12, padding: '0 4px' }}
+                onClick={() => { setSearchQuery(''); setSearchOpen(false) }}
+              >
+                ✕
+              </span>
+            )}
+            {isStandardUser && !searchQuery && (
               <span style={{ font: '500 10px var(--m)', border: '1px solid var(--line)', borderRadius: 5, padding: '1px 5px', color: 'var(--mut)', background: 'var(--surface2)' }}>⌘K</span>
+            )}
+
+            {searchOpen && searchQuery && (
+              <div
+                style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, minWidth: 320,
+                  background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12,
+                  boxShadow: 'var(--shadow-lift)', padding: 7, zIndex: 40, maxHeight: 420, overflowY: 'auto',
+                }}
+              >
+                {!hasSearchResults && (
+                  <div className="tiny mut" style={{ padding: '10px 8px' }}>No matches for "{searchQuery}".</div>
+                )}
+                {searchResults.map((group) => (
+                  <div key={group.label} style={{ marginBottom: 4 }}>
+                    <div className="lab" style={{ padding: '6px 8px 2px' }}>{group.label}</div>
+                    {group.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="tiny"
+                        style={{ padding: '7px 8px', borderRadius: 8, cursor: 'pointer' }}
+                        onMouseDown={() => goToSearchResult(item)}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface2)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <b style={{ font: '600 12.5px var(--d)' }}>{item.title}</b>
+                        <div className="tiny mut" style={{ fontSize: 11 }}>{item.subtitle}</div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 

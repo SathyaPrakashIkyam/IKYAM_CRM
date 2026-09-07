@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { accountsApi, quotesApi, productsApi, priceListsApi, productGroupsApi } from '../api/endpoints'
@@ -62,10 +63,16 @@ export default function Quotes() {
   const [selectedQuote, setSelectedQuote] = useState(null)
 
   const companyId = currentCompanyId()
+  const location = useLocation()
 
   function load() {
     if (!companyId) return
-    quotesApi.list(companyId).then(setQuotes)
+    quotesApi.list(companyId).then((data) => {
+      setQuotes(data)
+      const openId = location.state?.openId
+      const toOpen = openId && data.find((q) => q.id === openId)
+      if (toOpen) setSelectedQuote(toOpen)
+    })
     accountsApi.list(companyId).then(setAccounts)
     productsApi.list(companyId).then(setProducts)
     priceListsApi.list(companyId).then(setPriceLists)
@@ -83,7 +90,7 @@ export default function Quotes() {
     setForm({ ...form, lines })
   }
 
-  useEffect(load, [companyId])
+  useEffect(load, [companyId, location.state])
 
   useEffect(() => {
     if (!selectedPriceListId) {

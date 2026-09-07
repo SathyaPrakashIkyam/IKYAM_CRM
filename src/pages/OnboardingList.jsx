@@ -63,6 +63,7 @@ export default function OnboardingList() {
             : item
         )
       )
+      setConfirmRecord(null)
       setModalState({
         open: true,
         title: 'Approval Successful',
@@ -77,6 +78,7 @@ export default function OnboardingList() {
         err.response?.data?.message ||
         'Approval request failed'
 
+      setConfirmRecord(null)
       setModalState({
         open: true,
         title: 'Approval Failed',
@@ -158,7 +160,7 @@ export default function OnboardingList() {
               }}
             />
           </div>
-          <button className="btn" onClick={loadForms} disabled={loading}>
+          <button className="btn" onClick={loadForms} disabled={loading || !!approvingId}>
             ⟲ Refresh
           </button>
         </div>
@@ -171,7 +173,17 @@ export default function OnboardingList() {
 
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--mut)' }}>
-            <span className="login-spinner" style={{ borderColor: 'var(--line)', borderTopColor: 'var(--primary)' }} />
+            <span
+              className="onboarding-spinner"
+              style={{
+                display: 'inline-block',
+                width: 26,
+                height: 26,
+                border: '2.5px solid var(--line)',
+                borderTopColor: 'var(--primary)',
+                borderRadius: '50%',
+              }}
+            />
             <div style={{ marginTop: 10 }}>Loading onboarding requests…</div>
           </div>
         ) : filtered.length === 0 ? (
@@ -253,16 +265,36 @@ export default function OnboardingList() {
                           <button
                             type="button"
                             className="btn pri"
-                            disabled={isApproving || !targetId}
-                            style={{ padding: '4px 10px', fontSize: 12 }}
+                            disabled={isApproving || !!approvingId || !targetId}
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: 12,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
                             onClick={() => setConfirmRecord(item)}
                           >
+                            {isApproving && (
+                              <span
+                                className="onboarding-spinner"
+                                style={{
+                                  width: 12,
+                                  height: 12,
+                                  border: '2px solid rgba(255, 255, 255, 0.35)',
+                                  borderTopColor: '#ffffff',
+                                  borderRadius: '50%',
+                                  display: 'inline-block',
+                                }}
+                              />
+                            )}
                             {isApproving ? 'Approving…' : '✓ Approve'}
                           </button>
                         )}
                         <button
                           type="button"
                           className="btn"
+                          disabled={!!approvingId}
                           style={{ padding: '4px 10px', fontSize: 12 }}
                           onClick={() => navigate('/onboarding', { state: { record: item } })}
                         >
@@ -272,6 +304,7 @@ export default function OnboardingList() {
                           <button
                             type="button"
                             className="btn"
+                            disabled={!!approvingId}
                             style={{ padding: '4px 10px', fontSize: 12 }}
                             onClick={() => setAiKeyRecord(item)}
                           >
@@ -290,7 +323,181 @@ export default function OnboardingList() {
       </div>
 
       {/* Approval Confirmation Warning Dialog */}
-      {confirmRecord && (
+      {confirmRecord && (() => {
+        const isApprovingThis = approvingId && (approvingId === confirmRecord.onboard_company_id || approvingId === confirmRecord.id)
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              background: 'rgba(0, 0, 0, 0.45)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20,
+            }}
+            onClick={() => {
+              if (!approvingId) setConfirmRecord(null)
+            }}
+          >
+            <div
+              style={{
+                background: 'var(--surface)',
+                border: `1.5px solid ${isApprovingThis ? 'var(--primary)' : 'var(--amber)'}`,
+                borderRadius: 20,
+                padding: '28px 32px',
+                maxWidth: 480,
+                width: '100%',
+                boxShadow: 'var(--shadow-lift), 0 24px 64px rgba(0,0,0,0.25)',
+                animation: 'onboardingFadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="rowx" style={{ gap: 12, marginBottom: 14 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    background: isApprovingThis ? 'var(--primary-soft)' : 'var(--amber-soft)',
+                    color: isApprovingThis ? 'var(--primary)' : 'var(--amber-ink)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}
+                >
+                  {isApprovingThis ? (
+                    <span
+                      className="onboarding-spinner"
+                      style={{
+                        width: 18,
+                        height: 18,
+                        border: '2px solid rgba(0, 114, 206, 0.25)',
+                        borderTopColor: 'var(--primary)',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                      }}
+                    />
+                  ) : (
+                    '❓'
+                  )}
+                </div>
+                <div>
+                  <h3 style={{ font: '700 17px var(--d)', color: 'var(--ink)', margin: 0 }}>
+                    {isApprovingThis ? 'Approving Company Workspace…' : 'Confirm Company Approval'}
+                  </h3>
+                  <span className="tiny mut">
+                    {isApprovingThis ? 'Please wait while workspace setup completes' : 'Action confirmation'}
+                  </span>
+                </div>
+              </div>
+
+              <p style={{ font: '400 13.5px var(--b)', color: 'var(--ink)', lineHeight: 1.5, marginBottom: isApprovingThis ? 16 : 22 }}>
+                {isApprovingThis ? (
+                  <>
+                    Approving company <b style={{ color: 'var(--primary)' }}>"{confirmRecord.company_name || confirmRecord.onboard_company_id}"</b>.
+                    Setting up tenant database schema and activating workspace access…
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to approve company{' '}
+                    <b style={{ color: 'var(--primary)' }}>
+                      "{confirmRecord.company_name || confirmRecord.onboard_company_id}"
+                    </b>
+                    {confirmRecord.onboard_company_id ? ` (${confirmRecord.onboard_company_id})` : ''}? This will approve the tenant request and activate company workspace access.
+                  </>
+                )}
+              </p>
+
+              {isApprovingThis && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '12px 14px',
+                    marginBottom: 20,
+                    borderRadius: 10,
+                    background: 'var(--surface2)',
+                    border: '1px solid var(--line)',
+                    fontSize: 13,
+                    color: 'var(--ink)',
+                  }}
+                >
+                  <span
+                    className="onboarding-spinner"
+                    style={{
+                      width: 16,
+                      height: 16,
+                      border: '2px solid rgba(0, 114, 206, 0.25)',
+                      borderTopColor: 'var(--primary)',
+                      borderRadius: '50%',
+                      display: 'inline-block',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span>Provisioning workspace & database schema. This may take a few seconds…</span>
+                </div>
+              )}
+
+              <div className="rowx" style={{ justifyContent: 'flex-end', gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={!!approvingId}
+                  onClick={() => setConfirmRecord(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn pri"
+                  disabled={!!approvingId}
+                  style={{
+                    background: 'var(--green)',
+                    borderColor: 'var(--green)',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    opacity: isApprovingThis ? 0.85 : 1,
+                    cursor: isApprovingThis ? 'not-allowed' : 'pointer',
+                  }}
+                  onClick={() => executeApprove(confirmRecord)}
+                >
+                  {isApprovingThis ? (
+                    <>
+                      <span
+                        className="onboarding-spinner"
+                        style={{
+                          width: 14,
+                          height: 14,
+                          border: '2px solid rgba(255, 255, 255, 0.35)',
+                          borderTopColor: '#ffffff',
+                          borderRadius: '50%',
+                          display: 'inline-block',
+                        }}
+                      />
+                      <span>Approving…</span>
+                    </>
+                  ) : (
+                    '✓ Yes, Approve Company'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Full-Screen Loading Overlay when approving outside the dialog */}
+      {approvingId && !confirmRecord && (
         <div
           style={{
             position: 'fixed',
@@ -304,76 +511,39 @@ export default function OnboardingList() {
             justifyContent: 'center',
             padding: 20,
           }}
-          onClick={() => setConfirmRecord(null)}
         >
           <div
             style={{
               background: 'var(--surface)',
-              border: '1.5px solid var(--amber)',
+              border: '1.5px solid var(--line)',
               borderRadius: 20,
-              padding: '28px 32px',
-              maxWidth: 480,
+              padding: '28px 36px',
+              maxWidth: 420,
               width: '100%',
+              textAlign: 'center',
               boxShadow: 'var(--shadow-lift), 0 24px 64px rgba(0,0,0,0.25)',
               animation: 'onboardingFadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <div className="rowx" style={{ gap: 12, marginBottom: 14 }}>
-              <div
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+              <span
+                className="onboarding-spinner"
                 style={{
-                  width: 40,
-                  height: 40,
+                  width: 32,
+                  height: 32,
+                  border: '3px solid rgba(0, 114, 206, 0.2)',
+                  borderTopColor: 'var(--primary)',
                   borderRadius: '50%',
-                  background: 'var(--amber-soft)',
-                  color: 'var(--amber-ink)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 20,
-                  fontWeight: 700,
-                  flexShrink: 0,
+                  display: 'inline-block',
                 }}
-              >
-                ❓
-              </div>
-              <div>
-                <h3 style={{ font: '700 17px var(--d)', color: 'var(--ink)', margin: 0 }}>
-                  Confirm Company Approval
-                </h3>
-                <span className="tiny mut">Action confirmation</span>
-              </div>
+              />
             </div>
-
-            <p style={{ font: '400 13.5px var(--b)', color: 'var(--ink)', lineHeight: 1.5, marginBottom: 22 }}>
-              Are you sure you want to approve company{' '}
-              <b style={{ color: 'var(--primary)' }}>
-                "{confirmRecord.company_name || confirmRecord.onboard_company_id}"
-              </b>
-              {confirmRecord.onboard_company_id ? ` (${confirmRecord.onboard_company_id})` : ''}? This will approve the tenant request and activate company workspace access.
+            <h3 style={{ font: '700 17px var(--d)', color: 'var(--ink)', margin: '0 0 6px' }}>
+              Approving Company Workspace…
+            </h3>
+            <p className="tiny mut" style={{ margin: 0, lineHeight: 1.5 }}>
+              Provisioning database schema and activating company access. Please wait…
             </p>
-
-            <div className="rowx" style={{ justifyContent: 'flex-end', gap: 10 }}>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => setConfirmRecord(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn pri"
-                style={{ background: 'var(--green)', borderColor: 'var(--green)', color: '#fff' }}
-                onClick={() => {
-                  const rec = confirmRecord
-                  setConfirmRecord(null)
-                  executeApprove(rec)
-                }}
-              >
-                ✓ Yes, Approve Company
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -564,8 +734,15 @@ function AiKeyModal({ record, onClose }) {
               onChange={(e) => setNewKey(e.target.value)}
               placeholder="Paste a Gemini API key…"
               style={{
-                flex: 1, padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8,
-                background: 'var(--surface2)', color: 'var(--ink)', font: '500 12.5px var(--b)',
+                padding: "0 14px",
+                width: "73%",
+                height: "32px",
+                background: "var(--surface2)",
+                color: "var(--ink)",
+                font: "500 13.5px var(--b)",
+                outline: "none",
+                border: "1px solid var(--line)",
+                borderRadius: "8px",
               }}
             />
             <button className="btn pri" disabled={saving}>{saving ? 'Adding…' : '＋ Add key'}</button>

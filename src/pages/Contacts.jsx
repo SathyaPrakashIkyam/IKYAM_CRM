@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
-import { accountsApi, contactsApi } from '../api/endpoints'
+import { accountsApi, contactsApi, leadsApi } from '../api/endpoints'
 import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
 import '../styles/Contacts.css'
@@ -10,48 +10,68 @@ import '../styles/Contacts.css'
 export default function Contacts() {
   const [contacts, setContacts] = useState([])
   const [accounts, setAccounts] = useState([])
+  const [leads, setLeads] = useState([])
   const [selected, setSelected] = useState(null)
   const [showNew, setShowNew] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [accountFilter, setAccountFilter] = useState('all')
+  const [formError, setFormError] = useState('')
 
-  const [newContact, setNewContact] = useState({
+  const emptyContact = {
     first_name: '',
     last_name: '',
     title: '',
     account_id: '',
+    lead_id: '',
     primary_email: '',
     primary_phone: '',
-  })
+  }
+  const [newContact, setNewContact] = useState(emptyContact)
 
   const navigate = useNavigate()
+  const location = useLocation()
   const companyId = currentCompanyId()
 
   function load() {
     if (!companyId) return
     contactsApi.list(companyId).then((data) => {
       setContacts(data)
-      if (data.length && !selected) setSelected(data[0])
+      const openId = location.state?.openId
+      const toSelect = (openId && data.find((c) => c.id === openId)) || (data.length && !selected ? data[0] : null)
+      if (toSelect) setSelected(toSelect)
     })
     accountsApi.list(companyId).then(setAccounts).catch(() => {})
+    leadsApi.list(companyId).then(setLeads).catch(() => {})
   }
 
-  useEffect(load, [companyId])
+  useEffect(load, [companyId, location.state])
 
   async function createContact(e) {
     e.preventDefault()
-    const created = await contactsApi.create(companyId, newContact)
-    setContacts((prev) => [created, ...prev])
-    setSelected(created)
-    setNewContact({
-      first_name: '',
-      last_name: '',
-      title: '',
-      account_id: '',
-      primary_email: '',
-      primary_phone: '',
-    })
-    setShowNew(false)
+    setFormError('')
+    if (!newContact.first_name.trim()) return setFormError('First name is required')
+    if (!newContact.last_name.trim()) return setFormError('Last name is required')
+
+    const payload = {
+      ...newContact,
+      account_id: newContact.account_id || undefined,
+      lead_id: newContact.lead_id || undefined,
+      primary_email: newContact.primary_email || undefined,
+      primary_phone: newContact.primary_phone || undefined,
+      title: newContact.title || undefined,
+    }
+
+    try {
+      const created = await contactsApi.create(companyId, payload)
+      setContacts((prev) => [created, ...prev])
+      setSelected(created)
+      setNewContact(emptyContact)
+      setShowNew(false)
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const message = Array.isArray(detail) ? detail.map((d) => d.msg).join('; ') : (detail?.message || detail)
+      setFormError(message || 'Failed to create contact')
+    }
   }
 
   // Filtered contacts list
@@ -83,6 +103,7 @@ export default function Contacts() {
   }
 
   const selectedAccount = selected ? accounts.find((a) => a.id === selected.account_id) : null
+  const selectedLead = selected ? leads.find((l) => l.id === selected.lead_id) : null
 
   return (
     <AppShell>
@@ -102,7 +123,7 @@ export default function Contacts() {
                   <button
                     className="btn pri"
                     style={{ padding: '6px 14px', borderRadius: 18 }}
-                    onClick={() => setShowNew(true)}
+                    onClick={() => { setFormError(''); setNewContact(emptyContact); setShowNew(true) }}
                   >
                     ＋ New contact
                   </button>
@@ -148,6 +169,7 @@ export default function Contacts() {
                   const initials = avatarInitials(c)
                   const isSel = selected?.id === c.id
                   const acc = accounts.find((a) => a.id === c.account_id)
+                  const lead = leads.find((l) => l.id === c.lead_id)
                   return (
                     <div
                       key={c.id}
@@ -161,7 +183,7 @@ export default function Contacts() {
                           <div>
                             <b>{c.first_name ? `${c.first_name} ${c.last_name}` : c.last_name}</b>
                             <div className="tiny" style={{ color: 'var(--mut)' }}>
-                              {c.title || acc?.name || '—'}
+                              {c.title || acc?.name || lead?.name || '—'}
                             </div>
                           </div>
                         </div>
@@ -239,6 +261,13 @@ export default function Contacts() {
                     </div>
 
                     <div className="contact-info-card">
+                      <span className="lab" style={{ display: 'block', marginBottom: 6 }}>Lead</span>
+                      <b style={{ font: '600 13px var(--d)' }}>
+                        {selectedLead ? `${selectedLead.name} (${selectedLead.lead_no})` : 'None'}
+                      </b>
+                    </div>
+
+                    <div className="contact-info-card">
                       <span className="lab" style={{ display: 'block', marginBottom: 6 }}>Contact ID</span>
                       <span className="mono tiny mut">{selected.id ? selected.id.slice(0, 8) : '—'}</span>
                     </div>
@@ -273,9 +302,10 @@ export default function Contacts() {
               <form onSubmit={createContact}>
                 <div className="contact-modal-form-grid">
                   <div>
-                    <label className="contact-modal-label">First Name</label>
+                    <label className="contact-modal-label">First Name *</label>
                     <input
                       type="text"
+                      required
                       placeholder="e.g. Rahul"
                       className="contact-modal-input"
                       value={newContact.first_name}
@@ -320,6 +350,23 @@ export default function Contacts() {
                     />
                   </div>
 
+                  <div className="contact-modal-full-width">
+                    <label className="contact-modal-label">Lead</label>
+                    <CustomSelect
+                      options={[
+                        { value: '', label: 'Select a lead (optional)...' },
+                        ...leads.map((l) => ({ value: l.id, label: `${l.name} · ${l.lead_no}` })),
+                      ]}
+                      value={newContact.lead_id}
+                      onChange={(val) => setNewContact({ ...newContact, lead_id: val })}
+                      className="contact-modal-custom-select"
+                      placeholder="Select a lead..."
+                    />
+                    <span className="tiny mut" style={{ display: 'block', marginTop: 4 }}>
+                      Attach this contact to a Lead — you can add multiple contacts under the same Lead.
+                    </span>
+                  </div>
+
                   <div>
                     <label className="contact-modal-label">Work Email</label>
                     <input
@@ -345,6 +392,10 @@ export default function Contacts() {
                     />
                   </div>
                 </div>
+
+                {formError && (
+                  <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginTop: 10 }}>{formError}</div>
+                )}
 
                 <div className="contact-modal-actions">
                   <button type="button" className="btn ghost account-modal-cancel-btn" onClick={() => setShowNew(false)}>
