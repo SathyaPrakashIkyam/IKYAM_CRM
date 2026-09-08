@@ -90,8 +90,8 @@ export const opportunitiesApi = {
   create: (companyId, body) =>
     api.post('/opportunities', body, { params: { company_id: companyId } }).then((r) => r.data),
   get: (id) => api.get(`/opportunities/${id}`).then((r) => r.data),
-  moveStage: (id, toStageId) =>
-    api.post(`/opportunities/${id}/move-stage`, { to_stage_id: toStageId }).then((r) => r.data),
+  moveStage: (id, toStageId, lostReason) =>
+    api.post(`/opportunities/${id}/move-stage`, { to_stage_id: toStageId, lost_reason: lostReason }).then((r) => r.data),
   close: (id, body) => api.post(`/opportunities/${id}/close`, body).then((r) => r.data),
 }
 

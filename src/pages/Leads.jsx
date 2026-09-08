@@ -159,13 +159,17 @@ export default function Leads() {
       closeForm()
     } catch (err) {
       const detail = err?.response?.data?.detail
+      // Pydantic v2 prefixes every custom validator's raised ValueError with
+      // "Value error, " (e.g. "Value error, First name is required") — strip
+      // that off so the user sees the clean message the validator wrote.
+      const cleanMsg = (msg) => (typeof msg === 'string' ? msg.replace(/^Value error,\s*/, '') : msg)
       let message
       if (Array.isArray(detail)) {
-        message = detail.map((d) => d.msg).join('; ')
+        message = detail.map((d) => cleanMsg(d.msg)).join('; ')
       } else if (detail && typeof detail === 'object') {
-        message = detail.message
+        message = cleanMsg(detail.message)
       } else {
-        message = detail
+        message = cleanMsg(detail)
       }
       setFormError(message || `Failed to ${editingId ? 'update' : 'create'} lead`)
     }

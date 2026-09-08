@@ -26,6 +26,7 @@ export default function Accounts() {
   const [selected, setSelected] = useState(null)
   const [related, setRelated] = useState({ contacts: [], opportunities: [], quotes: [] })
   const [showNew, setShowNew] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [newAccount, setNewAccount] = useState({ name: '', industry: '' })
   const navigate = useNavigate()
@@ -62,6 +63,32 @@ export default function Accounts() {
     setShowNew(false)
   }
 
+  function openEdit(account) {
+    setEditingId(account.id)
+    setNewAccount({ name: account.name || '', industry: account.industry || '' })
+    setShowNew(true)
+  }
+
+  async function saveAccount(e) {
+    e.preventDefault()
+    if (editingId) {
+      const updated = await accountsApi.update(editingId, newAccount)
+      setAccounts((prev) => prev.map((a) => (a.id === editingId ? updated : a)))
+      if (selected?.id === editingId) setSelected(updated)
+      setEditingId(null)
+      setNewAccount({ name: '', industry: '' })
+      setShowNew(false)
+    } else {
+      await createAccount(e)
+    }
+  }
+
+  function closeModal() {
+    setShowNew(false)
+    setEditingId(null)
+    setNewAccount({ name: '', industry: '' })
+  }
+
   const openValue = related.opportunities
     .filter((o) => o.status === 'open')
     .reduce((sum, o) => sum + (o.amount || 0), 0)
@@ -85,7 +112,7 @@ export default function Accounts() {
               <div className="accounts-sidebar-header">
                 <div className="rowx sp" style={{ padding: '12px 15px', borderBottom: '1px solid var(--line)' }}>
                   <b style={{ font: '600 13px var(--d)' }}>Accounts · {filteredAccounts.length}</b>
-                  <button className="btn pri" style={{ padding: '6px 14px', borderRadius: 18 }} onClick={() => setShowNew(true)}>
+                  <button className="btn pri" style={{ padding: '6px 14px', borderRadius: 18 }} onClick={() => { setEditingId(null); setNewAccount({ name: '', industry: '' }); setShowNew(true) }}>
                     ＋ New account
                   </button>
                 </div>
@@ -136,7 +163,10 @@ export default function Accounts() {
                       <b style={{ font: '600 15px var(--d)' }}>{selected.name}</b>
                       <div className="tiny">{selected.account_no} · {selected.industry || selected.account_type || 'General'}</div>
                     </div>
-                    <button className="btn pri" onClick={() => navigate('/pipeline')}>＋ New opportunity</button>
+                    <div className="rowx" style={{ gap: 8 }}>
+                      <button className="btn ghost" onClick={() => openEdit(selected)}>Edit</button>
+                      <button className="btn pri" onClick={() => navigate('/pipeline')}>＋ New opportunity</button>
+                    </div>
                   </div>
 
                   <div className="ai-frame" style={{ padding: 12, marginTop: 13 }}>
@@ -187,22 +217,22 @@ export default function Accounts() {
           </div>
         </div>
 
-        {/* Centered Frosted Glass Add Account Modal */}
+        {/* Centered Frosted Glass Add/Edit Account Modal */}
         {showNew && (
-          <div className="account-modal-overlay" onClick={() => setShowNew(false)}>
+          <div className="account-modal-overlay" onClick={closeModal}>
             <div className="account-modal-card" onClick={(e) => e.stopPropagation()}>
               <div className="account-modal-header">
                 <div className="account-modal-title-row">
                   <div className="account-modal-icon-badge">🏢</div>
                   <div>
-                    <h3>Add new account</h3>
+                    <h3>{editingId ? 'Edit account' : 'Add new account'}</h3>
                     <span className="tiny mut">Company details for your sales pipeline</span>
                   </div>
                 </div>
-                <button type="button" className="account-modal-close" onClick={() => setShowNew(false)}>✕</button>
+                <button type="button" className="account-modal-close" onClick={closeModal}>✕</button>
               </div>
 
-              <form onSubmit={createAccount}>
+              <form onSubmit={saveAccount}>
                 <div className="account-modal-form-grid">
                   <div className="account-modal-full-width">
                     <label className="account-modal-label">Company Name *</label>
@@ -229,11 +259,11 @@ export default function Accounts() {
                 </div>
 
                 <div className="account-modal-actions">
-                  <button type="button" className="btn ghost account-modal-cancel-btn" onClick={() => setShowNew(false)}>
+                  <button type="button" className="btn ghost account-modal-cancel-btn" onClick={closeModal}>
                     Cancel
                   </button>
                   <button type="submit" className="btn pri account-modal-submit-btn">
-                    Create account ✓
+                    {editingId ? 'Save changes ✓' : 'Create account ✓'}
                   </button>
                 </div>
               </form>

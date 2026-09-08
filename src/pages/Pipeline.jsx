@@ -36,6 +36,9 @@ export default function Pipeline() {
   const [stageFilter, setStageFilter] = useState(['all'])
   const [dragCard, setDragCard] = useState(null) // { id, fromStageId }
   const [dragOverStage, setDragOverStage] = useState(null)
+  const [lostPrompt, setLostPrompt] = useState(null) // { cardId, toStageId }
+  const [lostReasonText, setLostReasonText] = useState('')
+  const [lostReasonError, setLostReasonError] = useState('')
   const navigate = useNavigate()
   const companyId = currentCompanyId()
 
@@ -94,9 +97,41 @@ export default function Pipeline() {
     )
   }
 
-  async function moveCard(cardId, toStageId) {
-    await opportunitiesApi.moveStage(cardId, toStageId)
+  async function moveCard(cardId, toStageId, lostReason) {
+    await opportunitiesApi.moveStage(cardId, toStageId, lostReason)
     load()
+  }
+
+  // Any path that can land a deal on a "lost" stage — drag-and-drop or the
+  // per-card stage dropdown — funnels through here first. Moving straight to
+  // a non-lost stage still goes through immediately; moving to "lost" always
+  // stops to collect a reason before the change is ever sent to the server.
+  function requestMoveCard(cardId, toStageId) {
+    const targetStage = allStages.find((s) => s.id === toStageId)
+    if (targetStage?.stage_kind === 'lost') {
+      setLostReasonText('')
+      setLostReasonError('')
+      setLostPrompt({ cardId, toStageId })
+      return
+    }
+    moveCard(cardId, toStageId)
+  }
+
+  async function confirmLostReason() {
+    if (!lostReasonText.trim()) {
+      setLostReasonError('Please provide a reason for changing this Lead to Lost.')
+      return
+    }
+    await moveCard(lostPrompt.cardId, lostPrompt.toStageId, lostReasonText.trim())
+    setLostPrompt(null)
+    setLostReasonText('')
+    setLostReasonError('')
+  }
+
+  function cancelLostReason() {
+    setLostPrompt(null)
+    setLostReasonText('')
+    setLostReasonError('')
   }
 
   function handleDragStart(card, stageId) {
@@ -110,7 +145,7 @@ export default function Pipeline() {
 
   function handleDrop(stageId) {
     if (dragCard && dragCard.fromStageId !== stageId) {
-      moveCard(dragCard.id, stageId)
+      requestMoveCard(dragCard.id, stageId)
     }
     setDragCard(null)
     setDragOverStage(null)
@@ -251,10 +286,27 @@ export default function Pipeline() {
                               <span className={`av ${av.cls}`}>{card.owner_initials || av.initials}</span>
                             </div>
                           </div>
+                          {col.stage.stage_kind === 'lost' && card.lost_reason && (
+                            <div
+                              className="tiny"
+                              title={card.lost_reason}
+                              style={{
+                                color: 'var(--orange-ink)',
+                                marginTop: 6,
+                                fontStyle: 'italic',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              Reason: {card.lost_reason}
+                            </div>
+                          )}
                           <CustomSelect
                             options={allStages.map((s) => ({ value: s.id, label: s.name }))}
                             value={card.stage_id}
-                            onChange={(newStageId) => moveCard(card.id, newStageId)}
+                            onChange={(newStageId) => requestMoveCard(card.id, newStageId)}
                             className="pipeline-card-stage-select"
                           />
                         </div>
@@ -362,6 +414,47 @@ export default function Pipeline() {
         {wonThisTotal > 0 && (
           <div className="tiny" style={{ marginTop: 12 }}>
             <span className="chip ok">Won</span> ₹{Math.round(wonThisTotal).toLocaleString('en-IN')} closed to date
+          </div>
+        )}
+
+        {lostPrompt && (
+          <div className="lead-modal-overlay" onClick={cancelLostReason}>
+            <div className="lead-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+              <div className="lead-modal-header">
+                <div className="lead-modal-title-row">
+                  <div className="lead-modal-icon-badge">⚠</div>
+                  <div>
+                    <h3>Mark as Lost</h3>
+                    <span className="tiny mut">A reason is required before this deal can be marked lost</span>
+                  </div>
+                </div>
+                <button type="button" className="lead-modal-close" onClick={cancelLostReason}>✕</button>
+              </div>
+              <div className="title-bar" style={{ margin: '0 0 20px 0', width: 44, height: 3 }} />
+
+              <label className="lead-modal-label">Reason *</label>
+              <textarea
+                autoFocus
+                rows={3}
+                placeholder="e.g. Went with a competitor on price"
+                className="lead-modal-input"
+                style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                value={lostReasonText}
+                onChange={(e) => { setLostReasonText(e.target.value); if (lostReasonError) setLostReasonError('') }}
+              />
+              {lostReasonError && (
+                <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginTop: 10 }}>{lostReasonError}</div>
+              )}
+
+              <div className="lead-modal-actions">
+                <button type="button" className="btn ghost lead-modal-cancel-btn" onClick={cancelLostReason}>
+                  Cancel
+                </button>
+                <button type="button" className="btn pri lead-modal-submit-btn" onClick={confirmLostReason}>
+                  Confirm Lost ✓
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

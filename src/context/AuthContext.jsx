@@ -54,7 +54,11 @@ export function AuthProvider({ children }) {
     const activeId = auth.schema_id || auth.tenant_uuid;
     if (activeId) {
       setCompanies([{ id: activeId, name: auth.schema_id || activeId }])
-      if (!companyId) {
+      // Always re-sync to the session's real company_id — never trust a
+      // stale value already sitting in localStorage from a previous
+      // session/account (that's how one browser could keep querying the
+      // wrong tenant even after a fresh login).
+      if (companyId !== activeId) {
         setCurrentCompanyId(activeId)
         setCompanyId(activeId)
       }

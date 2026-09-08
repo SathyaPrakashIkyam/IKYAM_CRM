@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppShell from '../components/AppShell'
-import { accountsApi, activitiesApi, opportunitiesApi, quotesApi } from '../api/endpoints'
+import { accountsApi, activitiesApi, opportunitiesApi } from '../api/endpoints'
+import { openActivityInProvider, detectProviderFromEmail } from '../utils/activityLinks'
+import { useAuth } from '../context/AuthContext'
 import '../styles/ikyam-mock.css'
 import '../styles/Record.css'
 
@@ -14,6 +16,8 @@ const ACTIVITY_TYPES = [
 
 export default function Record() {
   const { id } = useParams()
+  const { user } = useAuth()
+  const provider = detectProviderFromEmail(user?.email) // 'google' | 'outlook' — based on the logged-in user's own login email
   const [opp, setOpp] = useState(null)
   const [account, setAccount] = useState(null)
   const [activities, setActivities] = useState([])
@@ -22,7 +26,11 @@ export default function Record() {
   const [stages, setStages] = useState([])
   const [relatedQuotes, setRelatedQuotes] = useState([])
   const [contactsCount, setContactsCount] = useState(null)
+  const [primaryContactEmail, setPrimaryContactEmail] = useState('')
   const [tipDismissed, setTipDismissed] = useState(false)
+  const [showLostReason, setShowLostReason] = useState(false)
+  const [lostReasonText, setLostReasonText] = useState('')
+  const [lostReasonError, setLostReasonError] = useState('')
   const navigate = useNavigate()
   const activityInputRef = useRef(null)
 
@@ -34,11 +42,22 @@ export default function Record() {
     opportunitiesApi.get(id).then((o) => {
       setOpp(o)
       accountsApi.get(o.account_id).then(setAccount)
-      accountsApi.contacts(o.account_id).then((c) => setContactsCount(c.length)).catch(() => {})
+      accountsApi.contacts(o.account_id).then((c) => {
+        setContactsCount(c.length)
+        // Auto-fill the guest/recipient address from the account's primary
+        // contact, so meeting invites and emails go out without the user
+        // having to type the address in themselves.
+        const primary = c.find((ct) => ct.primary_email)
+        setPrimaryContactEmail(primary?.primary_email || '')
+      }).catch(() => {})
       opportunitiesApi.kanban(o.company_id).then((cols) => {
         setStages(cols.map((c) => c.stage).sort((a, b) => a.sort_order - b.sort_order))
       }).catch(() => {})
-      quotesApi.list(o.company_id).then((qs) => {
+      // Use the account-scoped endpoint (not the general quotes list) so this
+      // count reflects every quote actually tied to this deal — the general
+      // list is scoped to the logged-in user's own quotes for non-admins,
+      // which would under-count quotes owned by a teammate.
+      accountsApi.quotes(o.account_id).then((qs) => {
         setRelatedQuotes(qs.filter((q) => q.opportunity_id === o.id))
       }).catch(() => {})
     })
@@ -53,12 +72,20 @@ export default function Record() {
 
   async function addActivity() {
     const text = subject.trim() || `${activeType} logged`
-    await activitiesApi.create(opp.company_id, {
+    const activity = await activitiesApi.create(opp.company_id, {
       activity_type: activeType,
       subject: text,
       related_object_type: 'opportunity',
       related_record_id: id,
     })
+
+    // Meeting/email activities redirect straight into the logged-in user's
+    // own provider (Google or Outlook/Teams, detected from their login
+    // email) with the invite/compose window prefilled — no manual picker.
+    if (activeType === 'meeting' || activeType === 'email') {
+      openActivityInProvider(activity, provider, primaryContactEmail)
+    }
+
     setSubject('')
     loadActivities()
   }
@@ -69,8 +96,35 @@ export default function Record() {
   }
 
   async function closeDeal(outcome) {
+    if (outcome === 'lost') {
+      // Marking a deal lost always stops to collect a reason first — the
+      // API rejects a lost close without one anyway, so this just surfaces
+      // that requirement as a proper form instead of a failed request.
+      setLostReasonText('')
+      setLostReasonError('')
+      setShowLostReason(true)
+      return
+    }
     const updated = await opportunitiesApi.close(id, { outcome })
     setOpp(updated)
+  }
+
+  async function confirmLostReason() {
+    if (!lostReasonText.trim()) {
+      setLostReasonError('Please provide a reason for changing this Lead to Lost.')
+      return
+    }
+    const updated = await opportunitiesApi.close(id, { outcome: 'lost', lost_reason: lostReasonText.trim() })
+    setOpp(updated)
+    setShowLostReason(false)
+    setLostReasonText('')
+    setLostReasonError('')
+  }
+
+  function cancelLostReason() {
+    setShowLostReason(false)
+    setLostReasonText('')
+    setLostReasonError('')
   }
 
   if (!opp) {
@@ -95,6 +149,9 @@ export default function Record() {
               <div>
                 <div style={{ font: '600 16px var(--d)' }}>{opp.name}</div>
                 <div className="tiny">{opp.opportunity_no} · <span className={`chip ${opp.status === 'won' ? 'ok' : opp.status === 'lost' ? 'risk' : 'brand'}`}>{opp.status}</span></div>
+                {opp.status === 'lost' && opp.lost_reason && (
+                  <div className="tiny mut" style={{ marginTop: 4, fontStyle: 'italic' }}>Reason: {opp.lost_reason}</div>
+                )}
               </div>
               <div className="rowx" style={{ flexWrap: 'wrap' }}>
                 <button className="btn ghost" style={{ fontWeight: 700 }} onClick={focusActivityForm}>Log activity</button>
@@ -227,6 +284,47 @@ export default function Record() {
           </div>
         </div>
       </div>
+
+      {showLostReason && (
+        <div className="lead-modal-overlay" onClick={cancelLostReason}>
+          <div className="lead-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="lead-modal-header">
+              <div className="lead-modal-title-row">
+                <div className="lead-modal-icon-badge">⚠</div>
+                <div>
+                  <h3>Mark as Lost</h3>
+                  <span className="tiny mut">A reason is required before this deal can be marked lost</span>
+                </div>
+              </div>
+              <button type="button" className="lead-modal-close" onClick={cancelLostReason}>✕</button>
+            </div>
+            <div className="title-bar" style={{ margin: '0 0 20px 0', width: 44, height: 3 }} />
+
+            <label className="lead-modal-label">Reason *</label>
+            <textarea
+              autoFocus
+              rows={3}
+              placeholder="e.g. Went with a competitor on price"
+              className="lead-modal-input"
+              style={{ resize: 'vertical', fontFamily: 'inherit' }}
+              value={lostReasonText}
+              onChange={(e) => { setLostReasonText(e.target.value); if (lostReasonError) setLostReasonError('') }}
+            />
+            {lostReasonError && (
+              <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginTop: 10 }}>{lostReasonError}</div>
+            )}
+
+            <div className="lead-modal-actions">
+              <button type="button" className="btn ghost lead-modal-cancel-btn" onClick={cancelLostReason}>
+                Cancel
+              </button>
+              <button type="button" className="btn pri lead-modal-submit-btn" onClick={confirmLostReason}>
+                Confirm Lost ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   )
 }

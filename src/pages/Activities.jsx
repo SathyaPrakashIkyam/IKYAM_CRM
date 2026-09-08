@@ -3,6 +3,8 @@ import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { activitiesApi } from '../api/endpoints'
 import { currentCompanyId } from '../api/client'
+import { openActivityInProvider, detectProviderFromEmail } from '../utils/activityLinks'
+import { useAuth } from '../context/AuthContext'
 import '../styles/ikyam-mock.css'
 import '../styles/Activities.css'
 
@@ -11,6 +13,7 @@ const FILTERS = [
   { key: 'call', label: '☎ Calls' },
   { key: 'task', label: '✓ Tasks' },
   { key: 'meeting', label: '▤ Meetings' },
+  { key: 'email', label: '✉ Emails' },
 ]
 
 const ACTIVITY_TYPE_OPTIONS = [
@@ -25,7 +28,11 @@ export default function Activities() {
   const [filter, setFilter] = useState('all')
   const [showNew, setShowNew] = useState(false)
   const [form, setForm] = useState({ activity_type: 'call', subject: '', due_at: '' })
+  const [attendeeEmail, setAttendeeEmail] = useState('')
+  const { user } = useAuth()
+  const provider = detectProviderFromEmail(user?.email) // 'google' | 'outlook' — based on the logged-in user's own email
   const companyId = currentCompanyId()
+  const needsProvider = form.activity_type === 'meeting' || form.activity_type === 'email'
 
   function load() {
     if (!companyId) return
@@ -36,8 +43,17 @@ export default function Activities() {
 
   async function createActivity(e) {
     e.preventDefault()
-    await activitiesApi.create(companyId, form)
+    const activity = await activitiesApi.create(companyId, form)
+
+    // Meeting/email activities open the chosen provider (Gmail/Google Calendar
+    // or Outlook/Teams) prefilled with the activity's details. This is a pure
+    // frontend redirect — the CRM has already saved the activity by this point.
+    if (needsProvider) {
+      openActivityInProvider(activity, provider, attendeeEmail)
+    }
+
     setForm({ activity_type: 'call', subject: '', due_at: '' })
+    setAttendeeEmail('')
     setShowNew(false)
     load()
   }
@@ -165,6 +181,26 @@ export default function Activities() {
                       onChange={(e) => setForm({ ...form, subject: e.target.value })}
                     />
                   </div>
+
+                  {needsProvider && (
+                    <div className="lead-modal-full-width">
+                      <label className="lead-modal-label">
+                        {form.activity_type === 'meeting' ? 'Invite email' : 'Send to email'}
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="contact@example.com"
+                        className="lead-modal-input"
+                        value={attendeeEmail}
+                        onChange={(e) => setAttendeeEmail(e.target.value)}
+                      />
+                      <div className="tiny mut" style={{ marginTop: 4 }}>
+                        Will open in {provider === 'google'
+                          ? (form.activity_type === 'meeting' ? 'Google Calendar / Meet' : 'Gmail')
+                          : (form.activity_type === 'meeting' ? 'Outlook / Teams' : 'Outlook')} — based on your login email
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="lead-modal-actions">
