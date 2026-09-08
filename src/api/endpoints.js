@@ -98,6 +98,15 @@ export const opportunitiesApi = {
 export const quotesApi = {
   list: (companyId) => api.get('/quotes', { params: { company_id: companyId } }).then((r) => r.data),
   create: (companyId, body) => api.post('/quotes', body, { params: { company_id: companyId } }).then((r) => r.data),
+    update: (companyId, id, body) =>
+    api.put(`/quotes/${id}`, body, { params: { company_id: companyId } })
+      .catch((err) => {
+        if (err?.response?.status === 405) {
+          return api.patch(`/quotes/${id}`, body, { params: { company_id: companyId } })
+        }
+        throw err
+      })
+      .then((r) => r?.data || r),
   get: (id) => api.get(`/quotes/${id}`).then((r) => r.data),
   send: (id) => api.post(`/quotes/${id}/send`).then((r) => r.data),
   markAccepted: (id) => api.post(`/quotes/${id}/mark-accepted`).then((r) => r.data),
