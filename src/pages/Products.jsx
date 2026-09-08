@@ -6,6 +6,7 @@ import { currentCompanyId } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import '../styles/ikyam-mock.css'
 import '../styles/Products.css'
+import '../styles/Masters.css'
 
 const EMPTY_PRODUCT = {
   sku: '',
@@ -55,6 +56,8 @@ export default function Products() {
   const [priceLists, setPriceLists] = useState([])
   const [currencies, setCurrencies] = useState([])
   const [showNewPriceList, setShowNewPriceList] = useState(false)
+  const [plModalError, setPlModalError] = useState(null)
+  const [plSubmitting, setPlSubmitting] = useState(false)
   const [showNewCurrency, setShowNewCurrency] = useState(false)
   const [newCurrencyCode, setNewCurrencyCode] = useState('')
   const [plForm, setPlForm] = useState({ name: '', currency: 'INR' })
@@ -72,11 +75,11 @@ export default function Products() {
   const [pickerSuccessMsg, setPickerSuccessMsg] = useState(null)
   const [pickerErrorMsg, setPickerErrorMsg] = useState(null)
 
-  function loadCatalog() {
+function loadCatalog() {
     if (!companyId) return
-    productsApi.list(companyId).then(setProducts)
-    productGroupsApi.list().then(setGroups)
-    uomsApi.list().then(setUoms)
+    productsApi.list(companyId).then(setProducts).catch((e) => console.error('Failed to load products:', e))
+    productGroupsApi.list().then(setGroups).catch((e) => console.error('Failed to load product groups:', e))
+    uomsApi.list().then(setUoms).catch((e) => console.error('Failed to load UOMs:', e))
     productsApi.companySource().then(setCompanySource).catch(() => {})
   }
 
@@ -221,11 +224,31 @@ export default function Products() {
 
   async function createPriceList(e) {
     e.preventDefault()
-    const created = await priceListsApi.create(companyId, plForm)
-    setPlForm({ name: '', currency: 'INR' })
-    setShowNewPriceList(false)
-    loadPriceLists()
-    selectPriceList(created)
+    const trimmedName = plForm.name.trim()
+    if (!trimmedName) return
+
+    setPlSubmitting(true)
+    setPlModalError(null)
+    try {
+      const created = await priceListsApi.create(companyId, {
+        name: trimmedName,
+        currency: plForm.currency || 'INR',
+      })
+      setPlForm({ name: '', currency: 'INR' })
+      setShowNewPriceList(false)
+      loadPriceLists()
+      selectPriceList(created)
+    } catch (err) {
+      console.error('Failed to create price list:', err)
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to create price list'
+      setPlModalError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    } finally {
+      setPlSubmitting(false)
+    }
   }
 
   function selectPriceList(pl) {
@@ -1037,55 +1060,20 @@ export default function Products() {
                 <b style={{ font: '700 13.5px var(--d)' }}>Price Lists ({priceLists.length})</b>
                 {canManage && (
                   <button
+                    type="button"
                     className="btn pri"
                     style={{ padding: '5px 12px', borderRadius: 16, fontSize: 12 }}
-                    onClick={() => setShowNewPriceList((v) => !v)}
+                    onClick={() => {
+                      setPlForm({ name: '', currency: currencies[0]?.code || 'INR' })
+                      setPlModalError(null)
+                      setShowNewCurrency(false)
+                      setShowNewPriceList(true)
+                    }}
                   >
                     ＋ New
                   </button>
                 )}
               </div>
-
-              {canManage && showNewPriceList && (
-                <form
-                  onSubmit={createPriceList}
-                  style={{
-                    background: 'rgba(0, 201, 167, 0.08)',
-                    borderRadius: 14,
-                    padding: 12,
-                    marginBottom: 12,
-                  }}
-                >
-                  <input
-                    required
-                    value={plForm.name}
-                    onChange={(e) => setPlForm({ ...plForm, name: e.target.value })}
-                    placeholder="Price list name"
-                    className="products-modal-input"
-                    style={{ height: 36, marginBottom: 8 }}
-                  />
-                  <div className="rowx" style={{ gap: 6 }}>
-                    <CustomSelect
-                      options={currencies.map((c) => ({ value: c.code, label: c.code }))}
-                      value={plForm.currency}
-                      onChange={(c) => setPlForm({ ...plForm, currency: c })}
-                      style={{ flex: 1, height: 36 }}
-                    />
-                    <button className="btn pri" style={{ padding: '6px 14px', borderRadius: 16 }}>Create</button>
-                  </div>
-                  {!showNewCurrency ? (
-                    <span className="tiny products-link" onClick={() => setShowNewCurrency(true)} style={{ marginTop: 6, display: 'inline-block' }}>
-                      ＋ New currency
-                    </span>
-                  ) : (
-                    <div className="rowx" style={{ gap: 6, marginTop: 6 }}>
-                      <input value={newCurrencyCode} onChange={(e) => setNewCurrencyCode(e.target.value)} placeholder="USD" className="products-modal-input" style={{ height: 30, width: 80 }} maxLength={3} />
-                      <button type="button" className="btn ghost" style={{ padding: '3px 8px', fontSize: 11 }} onClick={createCurrency}>Save</button>
-                      <span className="tiny products-link" onClick={() => setShowNewCurrency(false)}>✕</span>
-                    </div>
-                  )}
-                </form>
-              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {priceLists.map((pl) => {
@@ -1236,6 +1224,141 @@ export default function Products() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Centered Frosted Glass Create Price List Modal */}
+        {canManage && showNewPriceList && (
+          <div
+            className="masters-modal-overlay"
+            onClick={() => !plSubmitting && setShowNewPriceList(false)}
+          >
+            <div className="masters-modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="masters-modal-header">
+                <div className="masters-modal-title-row">
+                  <div className="masters-modal-icon-badge">🏷️</div>
+                  <div>
+                    <h3 style={{ margin: 0, font: '800 18px var(--d)', color: 'var(--ink)' }}>New Price List</h3>
+                    <span className="tiny mut">Define a new price list with custom currency</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="products-modal-close"
+                  onClick={() => !plSubmitting && setShowNewPriceList(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={createPriceList}>
+                {plModalError && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 14,
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1.5px solid rgba(239, 68, 68, 0.28)',
+                      color: '#EF4444',
+                      fontSize: 13,
+                      marginBottom: 16,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontWeight: 500,
+                    }}
+                  >
+                    <span style={{ fontSize: 16 }}>⚠</span>
+                    <span>{plModalError}</span>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 16 }}>
+                  <label className="masters-modal-label">Price List Name *</label>
+                  <input
+                    required
+                    autoFocus
+                    placeholder="e.g. Standard Wholesale, Retail 2026, VIP Corporate"
+                    className="masters-modal-input"
+                    value={plForm.name}
+                    onChange={(e) => {
+                      setPlForm({ ...plForm, name: e.target.value })
+                      if (plModalError) setPlModalError(null)
+                    }}
+                    disabled={plSubmitting}
+                  />
+                  <span className="tiny mut" style={{ display: 'block', marginTop: 6 }}>
+                    Unique name identifying this pricing structure
+                  </span>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label className="masters-modal-label">Currency *</label>
+                  <CustomSelect
+                    options={currencies.map((c) => ({ value: c.code, label: c.code }))}
+                    value={plForm.currency}
+                    onChange={(val) => setPlForm({ ...plForm, currency: val })}
+                    className="products-modal-custom-select"
+                  />
+                  {!showNewCurrency ? (
+                    <span
+                      className="tiny products-link"
+                      onClick={() => setShowNewCurrency(true)}
+                      style={{ marginTop: 6, display: 'inline-block', cursor: 'pointer' }}
+                    >
+                      ＋ New currency
+                    </span>
+                  ) : (
+                    <div className="rowx" style={{ gap: 6, marginTop: 8 }}>
+                      <input
+                        value={newCurrencyCode}
+                        onChange={(e) => setNewCurrencyCode(e.target.value.toUpperCase())}
+                        placeholder="e.g. USD"
+                        className="masters-modal-input"
+                        style={{ height: 34, width: 100, textTransform: 'uppercase' }}
+                        maxLength={3}
+                        disabled={plSubmitting}
+                      />
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        style={{ padding: '4px 12px', fontSize: 12, borderRadius: 14 }}
+                        onClick={createCurrency}
+                        disabled={plSubmitting || !newCurrencyCode.trim()}
+                      >
+                        Save
+                      </button>
+                      <span
+                        className="tiny products-link"
+                        onClick={() => setShowNewCurrency(false)}
+                        style={{ cursor: 'pointer', padding: '0 4px' }}
+                      >
+                        ✕
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="masters-modal-actions">
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    style={{ padding: '10px 22px', borderRadius: 20 }}
+                    onClick={() => setShowNewPriceList(false)}
+                    disabled={plSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn pri masters-modal-submit-btn"
+                    disabled={plSubmitting || !plForm.name.trim()}
+                  >
+                    {plSubmitting ? 'Creating…' : 'Create Price List ✓'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

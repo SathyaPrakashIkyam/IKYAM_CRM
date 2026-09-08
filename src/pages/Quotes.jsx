@@ -25,6 +25,7 @@ export default function Quotes() {
   const [selectedPriceListId, setSelectedPriceListId] = useState('')
   const [priceMap, setPriceMap] = useState({})
   const [showNew, setShowNew] = useState(false)
+  const [editingQuote, setEditingQuote] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [taxCodes, setTaxCodes] = useState([])
 
@@ -59,9 +60,6 @@ export default function Quotes() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [accountFilter, setAccountFilter] = useState('all')
 
-  // Detail Modal State
-  const [selectedQuote, setSelectedQuote] = useState(null)
-
   const companyId = currentCompanyId()
   const location = useLocation()
 
@@ -71,7 +69,7 @@ export default function Quotes() {
       setQuotes(data)
       const openId = location.state?.openId
       const toOpen = openId && data.find((q) => q.id === openId)
-      if (toOpen) setSelectedQuote(toOpen)
+      if (toOpen) openEditQuote(toOpen)
     })
     accountsApi.list(companyId).then(setAccounts)
     productsApi.list(companyId).then(setProducts)
@@ -109,7 +107,7 @@ export default function Quotes() {
     setForm((f) => ({
       ...f,
       lines: f.lines.map((l) =>
-        l.product_id && priceMap[l.product_id] != null
+        l.product_id && priceMap[l.product_id] != null && (!l.unit_price || !editingQuote)
           ? { ...l, unit_price: priceMap[l.product_id] }
           : l
       ),
@@ -327,6 +325,37 @@ export default function Quotes() {
     return accounts.find((a) => a.id === form.account_id) || null
   }, [accounts, form.account_id])
 
+  function openEditQuote(q) {
+    if (!q) return
+    setEditingQuote(q)
+    setForm({
+      account_id: q.account_id || '',
+      lines: (q.lines && q.lines.length > 0)
+        ? q.lines.map((l) => ({
+            description: l.description || '',
+            quantity: l.quantity === '' || l.quantity == null ? 1 : Number(l.quantity),
+            unit_price: l.unit_price === '' || l.unit_price == null ? 0 : Number(l.unit_price),
+            discount_pct: l.discount_pct === '' || l.discount_pct == null ? 0 : Number(l.discount_pct),
+            tax_code: l.tax_code || 'GST',
+            tax_pct: l.tax_pct === '' || l.tax_pct == null ? 18 : Number(l.tax_pct),
+            product_id: l.product_id || null,
+            uom: l.uom || '',
+          }))
+        : [{ ...EMPTY_LINE }],
+    })
+    setSelectedPriceListId(q.price_list_id || (priceLists.length > 0 ? priceLists[0].id : ''))
+    setFormErrors({})
+    setShowNew(true)
+  }
+
+  function openNew() {
+    setEditingQuote(null)
+    setForm(EMPTY_FORM)
+    setSelectedPriceListId('')
+    setFormErrors({})
+    setShowNew(true)
+  }
+
   // Unique industries for the filter dropdown
   const uniqueIndustries = useMemo(() => {
     const set = new Set()
@@ -430,14 +459,28 @@ export default function Quotes() {
 
     try {
       setSubmitting(true)
-      await quotesApi.create(companyId, { ...form, lines })
+      if (editingQuote?.id) {
+        await quotesApi.update(companyId, editingQuote.id, {
+          ...form,
+          price_list_id: selectedPriceListId || undefined,
+          lines,
+        })
+      } else {
+        await quotesApi.create(companyId, {
+          ...form,
+          price_list_id: selectedPriceListId || undefined,
+          lines,
+        })
+      }
       setForm(EMPTY_FORM)
+      setEditingQuote(null)
       setSelectedPriceListId('')
       setFormErrors({})
       setShowNew(false)
       load()
     } catch (err) {
-      setFormErrors({ submit: err.response?.data?.detail || err.message || 'Failed to create quote.' })
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to save quote.'
+      setFormErrors({ submit: typeof msg === 'string' ? msg : JSON.stringify(msg) })
     } finally {
       setSubmitting(false)
     }
@@ -445,6 +488,8 @@ export default function Quotes() {
 
   function cancelNew() {
     setForm(EMPTY_FORM)
+    setEditingQuote(null)
+    setSelectedPriceListId('')
     setFormErrors({})
     setShowNew(false)
   }
@@ -646,7 +691,7 @@ export default function Quotes() {
                 fontWeight: 700,
                 boxShadow: '0 4px 14px rgba(0, 201, 167, 0.3)',
               }}
-              onClick={() => setShowNew(true)}
+              onClick={openNew}
             >
               ＋ New quote
             </button>
@@ -689,12 +734,27 @@ export default function Quotes() {
         {showNew && (
           <div className="quotes-create-card">
             <form onSubmit={createQuote}>
-              <div className="rowx sp" style={{ marginBottom: 8 }}>
+              <div className="rowx sp" style={{ marginBottom: 12, alignItems: 'center' }}>
                 <button type="button" className="btn ghost" onClick={cancelNew}>← Back to quotes</button>
-                <b style={{ font: '700 16px var(--d)' }}>Create New Quote</b>
-                  <div className="rowx sp" style={{ marginTop: 1 }}>
-                <span />
-                <span className="rowx" style={{ gap: 10 }}>
+                <div className="rowx" style={{ gap: 10, alignItems: 'center' }}>
+                  <b style={{ font: '700 16px var(--d)' }}>
+                    {editingQuote ? `Edit Quote · ${editingQuote.doc_num}` : 'Create New Quote'}
+                  </b>
+                  {editingQuote && (
+                    <>
+                      <span className="tiny mut">Rev {editingQuote.revision}</span>
+                      <span className={`quote-chip ${editingQuote.status || 'draft'}`}>
+                        {editingQuote.status || 'draft'}
+                      </span>
+                      {editingQuote.quote_type === 'sap_b1' && (
+                        <span className="quote-chip sap">
+                          SAP B1 · {editingQuote.erp_sync_status || 'synced'}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="rowx" style={{ gap: 10 }}>
                   <button type="button" className="btn ghost" onClick={cancelNew}>Cancel</button>
                   <button
                     type="submit"
@@ -702,10 +762,11 @@ export default function Quotes() {
                     style={{ background: 'linear-gradient(90deg, #00C9A7 0%, #0072CE 100%)', color: '#FFF' }}
                     disabled={submitting}
                   >
-                    {submitting ? 'Creating quote…' : 'Create quote ✓'}
+                    {submitting
+                      ? (editingQuote ? 'Saving quote…' : 'Creating quote…')
+                      : (editingQuote ? 'Save & Post quote ✓' : 'Create quote ✓')}
                   </button>
-                </span>
-              </div>
+                </div>
               </div>
 
               {/* Form Validation Error Banner */}
@@ -1262,7 +1323,7 @@ export default function Quotes() {
                 {filteredQuotes.map((q) => {
                   const acc = accounts.find((a) => a.id === q.account_id)
                   return (
-                    <tr key={q.id} className="hov" onClick={() => setSelectedQuote(q)}>
+                    <tr key={q.id} className="hov" onClick={() => openEditQuote(q)} style={{ cursor: 'pointer' }}>
                       <td>
                         <b className="mono">{q.doc_num}</b>
                         <span className="tiny mut" style={{ display: 'block', fontSize: 10.5 }}>Rev {q.revision}</span>
@@ -1306,88 +1367,6 @@ export default function Quotes() {
                 )}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {/* Detailed Quote Modal */}
-        {selectedQuote && (
-          <div className="quote-modal-overlay" onClick={() => setSelectedQuote(null)}>
-            <div className="quote-modal-card" onClick={(e) => e.stopPropagation()}>
-              <div className="quote-modal-header">
-                <div>
-                  <div className="rowx" style={{ gap: 10, alignItems: 'center' }}>
-                    <b style={{ font: '800 20px var(--d)' }}>{selectedQuote.doc_num}</b>
-                    <span className="tiny mut">Rev {selectedQuote.revision}</span>
-                    <span className={`quote-chip ${selectedQuote.status || 'draft'}`}>{selectedQuote.status || 'draft'}</span>
-                    {selectedQuote.quote_type === 'sap_b1' && (
-                      <span className="quote-chip sap">SAP B1 · {selectedQuote.erp_sync_status}</span>
-                    )}
-                  </div>
-                  <div className="tiny mut" style={{ marginTop: 4 }}>
-                    Account: <b>{accounts.find((a) => a.id === selectedQuote.account_id)?.name || '—'}</b>
-                  </div>
-                </div>
-                <button type="button" className="account-modal-close" onClick={() => setSelectedQuote(null)}>✕</button>
-              </div>
-
-              {/* Line Items Table */}
-              <div style={{ marginTop: 14 }}>
-                <div className="rowx sp" style={{ marginBottom: 8 }}>
-                  <span className="lab" style={{ margin: 0 }}>Line Items ({selectedQuote.lines?.length || 0})</span>
-                  {selectedQuote.lines?.length > 5 && (
-                    <span className="tiny mut">Scroll down to view all lines ↓</span>
-                  )}
-                </div>
-                <div style={{ maxHeight: 360, overflowY: 'auto', borderRadius: 12, border: '1px solid #E2E8F0' }}>
-                  <table className="quotes-table" style={{ fontSize: 12, margin: 0 }}>
-                    <thead style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--surface, #FAF6F0)' }}>
-                      <tr>
-                        <th style={{ width: 44, textAlign: 'center' }}>#</th>
-                        <th>Description</th>
-                        <th style={{ width: 80 }}>Qty</th>
-                        <th style={{ width: 110, textAlign: 'right' }}>Unit Price ₹</th>
-                        <th style={{ width: 75, textAlign: 'right' }}>Disc %</th>
-                        <th style={{ width: 100 }}>Tax</th>
-                        <th className="num" style={{ width: 120, textAlign: 'right' }}>Line Total ₹</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(selectedQuote.lines || []).map((line, idx) => (
-                        <tr key={line.id || idx}>
-                          <td style={{ textAlign: 'center', color: 'var(--mut)', font: '600 11.5px var(--m)' }}>
-                            {line.line_no || idx + 1}
-                          </td>
-                          <td>
-                            <b>{line.description}</b>
-                            {line.uom && (
-                              <span className="tiny mono mut" style={{ display: 'block', fontSize: 10.5 }}>
-                                UOM: {line.uom}
-                              </span>
-                            )}
-                          </td>
-                          <td>{line.quantity}</td>
-                          <td className="num mono">₹{Math.round(line.unit_price || 0).toLocaleString('en-IN')}</td>
-                          <td style={{ textAlign: 'right' }}>{line.discount_pct ? `${line.discount_pct}%` : '—'}</td>
-                          <td>{line.tax_code || 'GST'} ({line.tax_pct}%)</td>
-                          <td className="num mono">₹{Math.round(line.line_total || lineTotal(line)).toLocaleString('en-IN')}</td>
-                        </tr>
-                      ))}
-                      {(!selectedQuote.lines || selectedQuote.lines.length === 0) && (
-                        <tr><td colSpan={7} className="tiny mut" style={{ textAlign: 'center', padding: 20 }}>No line items recorded.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Financial Totals Summary */}
-              <div className="quotes-totals-card" style={{ marginTop: 18, background: 'var(--surface2, rgba(0,0,0,0.02))' }}>
-                <div className="fld"><span className="lab">Subtotal</span><span className="mono">₹{Math.round(selectedQuote.subtotal || 0).toLocaleString('en-IN')}</span></div>
-                <div className="fld"><span className="lab">Discount</span><span className="mono">−₹{Math.round(selectedQuote.discount_total || 0).toLocaleString('en-IN')}</span></div>
-                <div className="fld"><span className="lab">Tax Total</span><span className="mono">₹{Math.round(selectedQuote.tax_total || 0).toLocaleString('en-IN')}</span></div>
-                <div className="fld" style={{ border: 0 }}><b className="mono" style={{ fontSize: 16, color: '#00C9A7' }}>Grand Total ₹{Math.round(selectedQuote.total || 0).toLocaleString('en-IN')}</b></div>
-              </div>
-            </div>
           </div>
         )}
 

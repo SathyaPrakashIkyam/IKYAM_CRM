@@ -237,6 +237,13 @@
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
 }
 
+.quote-detail-builder-modal {
+  max-width: 1140px !important;
+  width: 95vw !important;
+  max-height: 92vh !important;
+  padding: 24px 28px !important;
+}
+
 .quote-modal-header {
   display: flex;
   align-items: center;
