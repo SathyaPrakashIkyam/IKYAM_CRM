@@ -404,8 +404,8 @@ export default function AppShell({ children, aiPanel }) {
       </aside>
 
       <div className="main">
-        <div className="topbar">
-          <div className="search" ref={searchBoxRef} style={{ position: 'relative' }}>
+        <div className={`topbar ${searchOpen || notifOpen ? 'topbar-dropdown-open' : ''}`}>
+          <div className="search" ref={searchBoxRef} style={{ position: 'relative', zIndex: searchOpen ? 100 : 'auto' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--mut)' }}>
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -435,13 +435,7 @@ export default function AppShell({ children, aiPanel }) {
             )}
 
             {searchOpen && searchQuery && (
-              <div
-                style={{
-                  position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, minWidth: 320,
-                  background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12,
-                  boxShadow: 'var(--shadow-lift)', padding: 7, zIndex: 40, maxHeight: 420, overflowY: 'auto',
-                }}
-              >
+              <div className="topbar-search-dropdown">
                 {!hasSearchResults && (
                   <div className="tiny mut" style={{ padding: '10px 8px' }}>No matches for "{searchQuery}".</div>
                 )}
@@ -536,11 +530,7 @@ export default function AppShell({ children, aiPanel }) {
                 }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
               )}
               {notifOpen && (
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: 280,
-                  background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12,
-                  boxShadow: 'var(--shadow-lift)', padding: 7, zIndex: 30,
-                }}>
+                <div className="topbar-notif-dropdown">
                   <div className="rowx sp" style={{ padding: '4px 6px 8px' }}>
                     <b className="tiny">Notifications</b>
                     {unreadCount > 0 && (

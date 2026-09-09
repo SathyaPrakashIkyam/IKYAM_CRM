@@ -7,6 +7,95 @@ import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
 import '../styles/Leads.css'
 
+// Completion percentage: red < 50, yellow 50–99, green = 100
+function completionColor(pct) {
+  if (pct >= 100) return '#1f9d55' // green
+  if (pct >= 50) return '#e0a800' // yellow
+  return '#d64545' // red
+}
+
+function CircularProgress({ value = 0, size = 32, strokeWidth = 2.6, showPercent = true, title }) {
+  const pct = Math.min(100, Math.max(0, Math.round(value || 0)))
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = pct >= 100 ? 0 : circumference * (1 - pct / 100)
+  const color = completionColor(pct)
+
+  return (
+    <div
+      className="lead-completion-circle"
+      title={title || `Lead information completeness: ${pct}%`}
+      style={{
+        position: 'relative',
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        flex: 'none',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: `${color}15`,
+        boxShadow: `0 0 0 1px ${color}20 inset`,
+      }}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          pointerEvents: 'none',
+        }}
+      >
+        {/* Background track circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--line, rgba(0, 0, 0, 0.12))"
+          strokeWidth={strokeWidth}
+          opacity={0.6}
+        />
+        {/* Circular progress arc */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{
+            transition: 'stroke-dashoffset 0.4s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease',
+            opacity: pct > 0 ? 1 : 0,
+          }}
+        />
+      </svg>
+      <span
+        style={{
+          font: `700 ${pct >= 100 ? '8.5px' : '9.3px'} `,
+          color,
+          lineHeight: 1,
+          zIndex: 1,
+          letterSpacing: '-0.2px',
+          display: 'inline-flex',
+          alignItems: 'baseline',
+          justifyContent: 'center',
+        }}
+      >
+        <b>{pct}</b>
+      
+      </span>
+    </div>
+  )
+}
+
 export default function Leads() {
   const [leads, setLeads] = useState([])
   const [selected, setSelected] = useState(null)
@@ -31,6 +120,7 @@ export default function Leads() {
     potential_amount: '',
   }
   const [newLead, setNewLead] = useState(emptyLead)
+  const [showMore, setShowMore] = useState(false)
   const [formError, setFormError] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
@@ -44,13 +134,6 @@ export default function Leads() {
   }
 
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-  // Completion percentage: red < 50, yellow 50–99, green = 100
-  function completionColor(pct) {
-    if (pct >= 100) return '#1f9d55' // green
-    if (pct >= 50) return '#e0a800' // yellow
-    return '#d64545' // red
-  }
 
   function openEdit(lead) {
     setFormError('')
@@ -72,7 +155,40 @@ export default function Leads() {
       pincode: lead.pincode || '',
       potential_amount: lead.potential_amount != null ? String(lead.potential_amount) : '',
     })
+    const hasOptional = Boolean(
+      lead.industry || lead.address_line1 || lead.address_line2 ||
+      lead.city || lead.state || lead.country || lead.pincode
+    )
+    setShowMore(hasOptional)
     setShowNew(true)
+  }
+
+  function handleReset() {
+    setFormError('')
+    if (editingId) {
+      const orig = leads.find((l) => l.id === editingId)
+      if (orig) {
+        setNewLead({
+          first_name: orig.first_name || '',
+          last_name: orig.last_name || '',
+          company_name: orig.company_name || '',
+          industry: orig.industry || '',
+          email: orig.email || '',
+          phone: orig.phone || '',
+          source: orig.source || 'manual',
+          source_other: orig.source_other || '',
+          address_line1: orig.address_line1 || '',
+          address_line2: orig.address_line2 || '',
+          city: orig.city || '',
+          state: orig.state || '',
+          country: orig.country || '',
+          pincode: orig.pincode || '',
+          potential_amount: orig.potential_amount != null ? String(orig.potential_amount) : '',
+        })
+        return
+      }
+    }
+    setNewLead(emptyLead)
   }
 
   function closeForm() {
@@ -80,6 +196,7 @@ export default function Leads() {
     setEditingId(null)
     setFormError('')
     setNewLead(emptyLead)
+    setShowMore(false)
   }
 
   function load() {
@@ -107,7 +224,7 @@ export default function Leads() {
     if (!firstName) return setFormError('First name is required')
     if (!lastName) return setFormError('Last name is required')
     if (!companyName) return setFormError('Company name is required')
-    if (!email && !phone) return setFormError('Either email or phone number is required')
+    if (!email && !phone) return setFormError('Either work email or phone number is required')
     if (email && !EMAIL_RE.test(email)) return setFormError('Please enter a valid email address')
     if (phone && phone.length !== 10) return setFormError('Phone number must be 10 digits')
     if (!newLead.source) return setFormError('Lead source is required')
@@ -214,17 +331,7 @@ export default function Leads() {
                 >
                   <div className="rowx sp">
                     <div className="rowx">
-                      <div
-                        title="Lead information completeness"
-                        style={{
-                          width: 32, height: 32, borderRadius: '50%', flex: 'none',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: completionColor(lead.completion_percentage),
-                          color: '#fff', font: '700 12px var(--d, system-ui, sans-serif)',
-                        }}
-                      >
-                        <b>{Math.round(lead.completion_percentage || 0)}</b>
-                      </div>
+                      <CircularProgress value={lead.completion_percentage} />
                       <div>
                         <b>{lead.name}</b>
                         <div className="tiny">
@@ -322,25 +429,30 @@ export default function Leads() {
             <div className="lead-modal-card" onClick={(e) => e.stopPropagation()}>
               <div className="lead-modal-header">
                 <div className="lead-modal-title-row">
-                  <div className="lead-modal-icon-badge">👤</div>
+                  <div className="lead-modal-icon-badge">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
                   <div>
                     <h3>{editingId ? 'Edit lead' : 'Add new lead'}</h3>
                     <span className="tiny mut">
-                      {editingId ? 'Update details and save the changes' : 'Fill in details to expand your sales pipeline'}
+                      {editingId ? 'Update details and save changes' : 'Fill in the details to expand your sales pipeline'}
                     </span>
                   </div>
                 </div>
-                <button type="button" className="lead-modal-close" onClick={closeForm}>✕</button>
+                <button type="button" className="lead-modal-close" onClick={closeForm} title="Close">✕</button>
               </div>
               <div className="title-bar" style={{ margin: '0 0 22px 0', width: 48, height: 3 }} />
 
               <form onSubmit={submitLead}>
-                <div className="lead-modal-form-grid">
+                {/* Mandatory / Initial View fields */}
+                <div className="lead-modal-form-grid" style={{ marginBottom: showMore ? 0 : 20 }}>
                   <div>
                     <label className="lead-modal-label">First name *</label>
                     <input
                       required
-                      placeholder="First name (e.g. Rahul)"
+                      placeholder="Rahul"
                       className="lead-modal-input"
                       value={newLead.first_name}
                       onChange={(e) => setNewLead({ ...newLead, first_name: e.target.value })}
@@ -350,7 +462,7 @@ export default function Leads() {
                     <label className="lead-modal-label">Last name *</label>
                     <input
                       required
-                      placeholder="Last name (e.g. Sharma)"
+                      placeholder="K"
                       className="lead-modal-input"
                       value={newLead.last_name}
                       onChange={(e) => setNewLead({ ...newLead, last_name: e.target.value })}
@@ -360,31 +472,23 @@ export default function Leads() {
                     <label className="lead-modal-label">Company name *</label>
                     <input
                       required
-                      placeholder="Company name (e.g. Acme Corp)"
+                      placeholder="IMDB"
                       className="lead-modal-input"
                       value={newLead.company_name}
                       onChange={(e) => setNewLead({ ...newLead, company_name: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="lead-modal-label">Industry</label>
-                    <CustomSelect
-                      options={[
-                        { value: '', label: 'Select industry' },
-                        { value: 'Technology / IT', label: 'Technology / IT' },
-                        { value: 'Manufacturing', label: 'Manufacturing' },
-                        { value: 'Retail', label: 'Retail' },
-                        { value: 'Healthcare', label: 'Healthcare' },
-                        { value: 'Finance / Banking', label: 'Finance / Banking' },
-                        { value: 'Education', label: 'Education' },
-                        { value: 'Real Estate', label: 'Real Estate' },
-                        { value: 'Logistics', label: 'Logistics' },
-                        { value: 'Hospitality', label: 'Hospitality' },
-                        { value: 'Other', label: 'Other' },
-                      ]}
-                      value={newLead.industry}
-                      onChange={(val) => setNewLead({ ...newLead, industry: val })}
-                      className="lead-modal-custom-select"
+                    <label className="lead-modal-label">Potential amount *</label>
+                    <input
+                      required
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="2424"
+                      className="lead-modal-input"
+                      value={newLead.potential_amount}
+                      onChange={(e) => setNewLead({ ...newLead, potential_amount: e.target.value })}
                     />
                   </div>
                   <div>
@@ -408,7 +512,7 @@ export default function Leads() {
                       onChange={(e) => setNewLead({ ...newLead, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                     />
                   </div>
-                  <div>
+                  <div className={newLead.source === 'other' ? '' : 'lead-modal-full-width'}>
                     <label className="lead-modal-label">Lead source *</label>
                     <CustomSelect
                       options={[
@@ -436,85 +540,135 @@ export default function Leads() {
                       />
                     </div>
                   )}
-                  <div>
-                    <label className="lead-modal-label">Address line 1</label>
-                    <input
-                      placeholder="Street / building"
-                      className="lead-modal-input"
-                      value={newLead.address_line1}
-                      onChange={(e) => setNewLead({ ...newLead, address_line1: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="lead-modal-label">Address line 2</label>
-                    <input
-                      placeholder="Area / landmark"
-                      className="lead-modal-input"
-                      value={newLead.address_line2}
-                      onChange={(e) => setNewLead({ ...newLead, address_line2: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="lead-modal-label">City</label>
-                    <input
-                      placeholder="City"
-                      className="lead-modal-input"
-                      value={newLead.city}
-                      onChange={(e) => setNewLead({ ...newLead, city: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="lead-modal-label">State</label>
-                    <input
-                      placeholder="State"
-                      className="lead-modal-input"
-                      value={newLead.state}
-                      onChange={(e) => setNewLead({ ...newLead, state: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="lead-modal-label">Country</label>
-                    <input
-                      placeholder="Country"
-                      className="lead-modal-input"
-                      value={newLead.country}
-                      onChange={(e) => setNewLead({ ...newLead, country: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="lead-modal-label">Pincode</label>
-                    <input
-                      placeholder="Pincode"
-                      className="lead-modal-input"
-                      maxLength={10}
-                      value={newLead.pincode}
-                      onChange={(e) => setNewLead({ ...newLead, pincode: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                    />
-                  </div>
-                  <div>
-                    <label className="lead-modal-label">Potential amount *</label>
-                    <input
-                      required
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Estimated deal value"
-                      className="lead-modal-input"
-                      value={newLead.potential_amount}
-                      onChange={(e) => setNewLead({ ...newLead, potential_amount: e.target.value })}
-                    />
-                  </div>
                 </div>
-                {formError && (
-                  <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginTop: 10 }}>{formError}</div>
+
+                {/* Additional optional fields (revealed via Show more options) */}
+                {showMore && (
+                  <div className="lead-modal-more-section">
+                    <div className="lead-modal-divider">
+                      <span>Additional information (optional)</span>
+                    </div>
+
+                    <div className="lead-modal-form-grid" style={{ marginBottom: 20 }}>
+                      <div className="lead-modal-full-width">
+                        <label className="lead-modal-label">Industry</label>
+                        <CustomSelect
+                          options={[
+                            { value: '', label: 'Select industry' },
+                            { value: 'Technology / IT', label: 'Technology / IT' },
+                            { value: 'Manufacturing', label: 'Manufacturing' },
+                            { value: 'Retail', label: 'Retail' },
+                            { value: 'Healthcare', label: 'Healthcare' },
+                            { value: 'Finance / Banking', label: 'Finance / Banking' },
+                            { value: 'Education', label: 'Education' },
+                            { value: 'Real Estate', label: 'Real Estate' },
+                            { value: 'Logistics', label: 'Logistics' },
+                            { value: 'Hospitality', label: 'Hospitality' },
+                            { value: 'Other', label: 'Other' },
+                          ]}
+                          value={newLead.industry}
+                          onChange={(val) => setNewLead({ ...newLead, industry: val })}
+                          className="lead-modal-custom-select"
+                        />
+                      </div>
+                      <div>
+                        <label className="lead-modal-label">Address line 1</label>
+                        <input
+                          placeholder="Street / building"
+                          className="lead-modal-input"
+                          value={newLead.address_line1}
+                          onChange={(e) => setNewLead({ ...newLead, address_line1: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="lead-modal-label">Address line 2</label>
+                        <input
+                          placeholder="Area / landmark"
+                          className="lead-modal-input"
+                          value={newLead.address_line2}
+                          onChange={(e) => setNewLead({ ...newLead, address_line2: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="lead-modal-label">City</label>
+                        <input
+                          placeholder="City"
+                          className="lead-modal-input"
+                          value={newLead.city}
+                          onChange={(e) => setNewLead({ ...newLead, city: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="lead-modal-label">State</label>
+                        <input
+                          placeholder="State"
+                          className="lead-modal-input"
+                          value={newLead.state}
+                          onChange={(e) => setNewLead({ ...newLead, state: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="lead-modal-label">Country</label>
+                        <input
+                          placeholder="Country"
+                          className="lead-modal-input"
+                          value={newLead.country}
+                          onChange={(e) => setNewLead({ ...newLead, country: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="lead-modal-label">Pincode</label>
+                        <input
+                          placeholder="Pincode"
+                          className="lead-modal-input"
+                          maxLength={10}
+                          value={newLead.pincode}
+                          onChange={(e) => setNewLead({ ...newLead, pincode: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
-                <div className="lead-modal-actions">
-                  <button type="button" className="btn ghost lead-modal-cancel-btn" onClick={closeForm}>
-                    Cancel
+
+                {formError && (
+                  <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginTop: 10, marginBottom: 12 }}>{formError}</div>
+                )}
+
+                <div className="lead-modal-actions-bar">
+                  <button
+                    type="button"
+                    className="lead-modal-toggle-more-btn"
+                    onClick={() => setShowMore((prev) => !prev)}
+                  >
+                    {showMore ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m18 15-6-6-6 6"/>
+                        </svg>
+                        <span>Show less options</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m6 9 6 6 6-6"/>
+                        </svg>
+                        <span>Show more options</span>
+                      </>
+                    )}
                   </button>
-                  <button type="submit" className="btn pri lead-modal-submit-btn">
-                    {editingId ? 'Save changes ✓' : 'Create lead ✓'}
-                  </button>
+
+                  <div className="lead-modal-actions-right">
+                    <button
+                      type="button"
+                      className="btn ghost lead-modal-reset-btn"
+                      onClick={handleReset}
+                    >
+                      Reset
+                    </button>
+                    <button type="submit" className="btn pri lead-modal-submit-btn">
+                      {editingId ? 'Save changes ✓' : 'Create lead ✓'}
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
