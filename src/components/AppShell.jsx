@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import ikyamLogo from '../assets/ikyam-relatepro-logo.png'
 import ikyamLogoDark from '../assets/Ikyam_RelatePro_WH_BG.png'
 import { notificationsApi, leadsApi, accountsApi, contactsApi, quotesApi, reportsApi } from '../api/endpoints'
+import { WS_BASE_URL, getAuthToken } from '../api/client'
 import AiChatWidget from './AiChatWidget'
 import '../styles/ikyam-mock.css'
 
@@ -176,7 +177,38 @@ export default function AppShell({ children, aiPanel }) {
 
   useEffect(() => {
     if (!isStandardUser) return
-    // notificationsApi.list().then(setNotifs).catch(() => {})
+    notificationsApi.list().then(setNotifs).catch(() => {})
+
+    // Live push: the backend sends a "notification" event over this socket
+    // the instant a reminder (e.g. "meeting in 15 minutes") is created, so
+    // it shows up on the bell without waiting for a refresh or a poll tick.
+    const token = getAuthToken()
+    let ws = null
+    if (token) {
+      ws = new WebSocket(`${WS_BASE_URL}/notifications/ws?token=${encodeURIComponent(token)}`)
+      ws.onmessage = (evt) => {
+        try {
+          const data = JSON.parse(evt.data)
+          if (data.type === 'notification' && data.notification) {
+            setNotifs((prev) => [data.notification, ...prev])
+          }
+        } catch {
+          // ignore malformed frames
+        }
+      }
+      ws.onerror = () => {}
+    }
+
+    // Fallback poll — covers the gap if the socket drops/reconnects, or the
+    // reminder was created while this tab was closed.
+    const poll = setInterval(() => {
+      notificationsApi.list().then(setNotifs).catch(() => {})
+    }, 60000)
+
+    return () => {
+      clearInterval(poll)
+      ws?.close()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

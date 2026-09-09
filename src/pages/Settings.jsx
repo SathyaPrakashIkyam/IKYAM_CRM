@@ -10,6 +10,7 @@ import '../styles/Masters.css'
 const TABS = [
   { key: 'general', label: '⚙ General', desc: 'Workspace name, default currency & timezones' },
   { key: 'fields', label: '▤ Custom fields', desc: 'Manage entity attributes for leads, accounts & quotes' },
+  { key: 'notifications', label: '⏰ Notifications', desc: 'Configure activity reminder timing' },
   { key: 'ai', label: '✦ AI Assistant', desc: 'Configure Gemini API keys and failover rotation' },
 ]
 
@@ -96,6 +97,7 @@ export default function Settings() {
         <div className="settings-content-scroll">
           {tab === 'general' && <GeneralPanel />}
           {tab === 'fields' && <CustomFieldsPanel />}
+          {tab === 'notifications' && <NotificationSettingsPanel />}
           {tab === 'ai' && <AiAssistantPanel />}
         </div>
       </div>
@@ -638,7 +640,130 @@ function CustomFieldsPanel() {
 }
 
 /* ==========================================================================
-   Panel 3: AI Assistant (Gemini API Keys)
+   Panel 3: Notification Settings (activity reminder timing)
+   ========================================================================== */
+function NotificationSettingsPanel() {
+  const [reminderMinutes, setReminderMinutes] = useState(15)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    setLoading(true)
+    settingsApi
+      .getGeneral()
+      .then((data) => setReminderMinutes(data.settings?.activity_reminder_minutes ?? 15))
+      .catch((err) => {
+        console.error('Failed to load notification settings:', err)
+        setError('Unable to load notification settings')
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    try {
+      await settingsApi.updateGeneral({ activity_reminder_minutes: reminderMinutes })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (err) {
+      console.error('Failed to save notification settings:', err)
+      setError(err?.response?.data?.detail || 'Failed to update reminder timing')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ maxWidth: 840 }}>
+      {/* Hero Explanatory Banner */}
+      <div className="ai-hero-banner">
+        <div style={{ fontSize: 26, lineHeight: 1 }}>⏰</div>
+        <div>
+          <h4 style={{ margin: 0, font: '800 16px var(--d)', color: 'var(--ink)' }}>
+            In-App Activity Reminders
+          </h4>
+          <p className="tiny" style={{ marginTop: 4, color: 'var(--mut)', lineHeight: 1.5 }}>
+            Every open task, call and meeting fires an in-app notification a set number of minutes before its
+            due or start time. Change that lead time here — it applies company-wide and takes effect on the
+            next reminder check, no restart needed.
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSave}>
+        {error && (
+          <div style={{ padding: '12px 16px', borderRadius: 14, background: 'rgba(239, 68, 68, 0.12)', border: '1.5px solid rgba(239, 68, 68, 0.28)', color: '#EF4444', fontSize: 13, marginBottom: 16 }}>
+            ⚠ {error}
+          </div>
+        )}
+
+        <div className="settings-card">
+          <div className="settings-section-head">
+            <div className="settings-section-icon">⏰</div>
+            <div>
+              <h3 className="settings-section-title">Activity Reminder Timing</h3>
+              <div className="settings-section-subtitle">
+                How long before a task/call/meeting's due or start time its in-app notification fires
+              </div>
+            </div>
+          </div>
+
+          <div className="settings-form-grid">
+            <div className="settings-form-group">
+              <label className="settings-form-label">Remind me before (minutes)</label>
+              <input
+                type="number"
+                min={1}
+                max={1440}
+                required
+                value={reminderMinutes}
+                onChange={(e) => setReminderMinutes(Number(e.target.value))}
+                className="settings-input"
+                style={{ maxWidth: 160 }}
+                disabled={loading || saving}
+              />
+              <span className="tiny mut" style={{ marginTop: 2 }}>
+                Applies to every open task, call and meeting across the company — e.g. 15 or 30 minutes ahead
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Toolbar */}
+        <div className="rowx" style={{ gap: 14, alignItems: 'center', marginTop: 16 }}>
+          <button
+            type="submit"
+            className="btn pri"
+            style={{
+              borderRadius: 22,
+              padding: '10px 24px',
+              font: '700 13px var(--b)',
+              background: 'linear-gradient(90deg, #00C9A7 0%, #0072CE 100%)',
+              color: '#FFFFFF',
+              boxShadow: '0 4px 14px rgba(0, 201, 167, 0.35)',
+            }}
+            disabled={saving || loading || !reminderMinutes || reminderMinutes < 1}
+          >
+            {saving ? 'Saving changes…' : 'Save changes ✓'}
+          </button>
+
+          {saved && (
+            <span className="chip ok" style={{ padding: '6px 14px', fontSize: 12 }}>
+              ✓ Reminder timing saved
+            </span>
+          )}
+        </div>
+      </form>
+    </div>
+  )
+}
+
+/* ==========================================================================
+   Panel 4: AI Assistant (Gemini API Keys)
    ========================================================================== */
 function AiAssistantPanel() {
   const [keys, setKeys] = useState([])
@@ -695,21 +820,6 @@ function AiAssistantPanel() {
 
   return (
     <div style={{ maxWidth: 840 }}>
-      {/* Hero Explanatory Banner */}
-      <div className="ai-hero-banner">
-        <div style={{ fontSize: 26, lineHeight: 1 }}>✦</div>
-        <div>
-          <h4 style={{ margin: 0, font: '800 16px var(--d)', color: 'var(--ink)' }}>
-            Gemini AI Copilot &amp; Smart Rotation
-          </h4>
-          <p className="tiny" style={{ marginTop: 4, color: 'var(--mut)', lineHeight: 1.5 }}>
-            Powers the AI assistant bubble across your CRM screens. You can register multiple Gemini API keys.
-            Requests automatically rotate using a <b>Least-Recently-Used (LRU) algorithm</b> to balance rate limits,
-            and seamlessly failover to subsequent keys if any quota is exceeded.
-          </p>
-        </div>
-      </div>
-
       {/* Metrics Strip */}
       <div className="settings-metrics-strip" style={{ marginBottom: 16 }}>
         <div className="settings-metric-col">

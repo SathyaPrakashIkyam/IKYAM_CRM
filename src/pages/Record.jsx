@@ -54,12 +54,13 @@ export default function Record() {
         setStages(cols.map((c) => c.stage).sort((a, b) => a.sort_order - b.sort_order))
       }).catch(() => {})
       // Use the account-scoped endpoint (not the general quotes list) so this
-      // count reflects every quote actually tied to this deal — the general
-      // list is scoped to the logged-in user's own quotes for non-admins,
-      // which would under-count quotes owned by a teammate.
-      accountsApi.quotes(o.account_id).then((qs) => {
-        setRelatedQuotes(qs.filter((q) => q.opportunity_id === o.id))
-      }).catch(() => {})
+      // count reflects every quote actually tied to this account — the
+      // general list is scoped to the logged-in user's own quotes for
+      // non-admins, which would under-count quotes owned by a teammate.
+      // Not filtered by opportunity_id: quotes aren't created against a
+      // specific deal in this app (the quote form only ever sets
+      // account_id), so that filter always evaluated to zero.
+      accountsApi.quotes(o.account_id).then(setRelatedQuotes).catch(() => {})
     })
     loadActivities()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -282,7 +283,7 @@ export default function Record() {
                   }
                 >
                   <span className="tiny">Quotes</span>
-                  <b className="tiny">{relatedQuotes.length}{relatedQuotes[0] ? ` — ${relatedQuotes[0].doc_num}` : ''}</b>
+                  <b className="tiny">{relatedQuotes.length}</b>
                 </div>
                 <div className="rec-related-row" onClick={() => navigate(`/accounts/${opp.account_id}`)}>
                   <span className="tiny">Contacts</span>
