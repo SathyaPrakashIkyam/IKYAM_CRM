@@ -55,7 +55,12 @@ export default function Activities() {
     const payload = {
       activity_type: form.activity_type,
       subject: form.subject,
-      due_at: form.due_at || undefined,
+      // form.due_at comes from a datetime-local input, e.g. "2026-09-09T12:10"
+      // — no timezone info. `new Date(...)` parses that as the browser's own
+      // local time, so .toISOString() gives the correct absolute UTC instant
+      // to store, instead of the naive string being reinterpreted as UTC
+      // server-side (which would silently shift it by the local offset).
+      due_at: form.due_at ? new Date(form.due_at).toISOString() : undefined,
       ...(form.lead_id
         ? {
             lead_id: form.lead_id,
@@ -217,13 +222,16 @@ export default function Activities() {
                   </div>
 
                   <div className={needsProvider ? '' : 'lead-modal-full-width'}>
-                    <label className="lead-modal-label">Due Date</label>
+                    <label className="lead-modal-label">Due date &amp; time</label>
                     <input
-                      type="date"
+                      type="datetime-local"
                       className="lead-modal-input"
                       value={form.due_at || ''}
                       onChange={(e) => setForm({ ...form, due_at: e.target.value })}
                     />
+                    <span className="tiny mut" style={{ marginTop: 2, display: 'block' }}>
+                      The exact time matters — it's what reminder notifications count down from
+                    </span>
                   </div>
 
                   {needsProvider && (
@@ -324,7 +332,7 @@ function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone
                 <div className="rowx" style={{ gap: 10 }}>
                   {a.due_at && (
                     <span className={`chip ${tone === 'risk' ? 'danger' : 'warn'}`}>
-                      {new Date(a.due_at).toLocaleDateString()}
+                      {new Date(a.due_at).toLocaleDateString()} {new Date(a.due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   )}
                   {a.status === 'open' && (

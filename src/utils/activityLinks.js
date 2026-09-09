@@ -2,9 +2,18 @@
 // in the user's chosen provider, prefilled from a CRM activity.
 // No backend call involved — these are plain URLs opened with window.open().
 
+function pad(n) {
+  return String(n).padStart(2, '0')
+}
+
 function toCompactIso(date) {
-  // Outlook deep link wants YYYY-MM-DDTHH:mm:ss (no ms/timezone suffix)
-  return date.toISOString().slice(0, 19)
+  // Outlook deep link wants YYYY-MM-DDTHH:mm:ss with NO timezone suffix — and
+  // critically, Outlook reads that string as wall-clock time in the viewer's
+  // own calendar timezone, not UTC. So this must use the local get* getters
+  // (not toISOString(), which is always UTC) or a time picked as, say,
+  // 12:08 PM local ends up showing as 06:38 AM once Outlook renders it.
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 function toGoogleIso(date) {

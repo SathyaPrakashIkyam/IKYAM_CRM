@@ -91,6 +91,8 @@ export default function AppShell({ children, aiPanel }) {
   })
   const [notifs, setNotifs] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
+  const [toast, setToast] = useState(null)
+  const toastTimerRef = useRef(null)
 
   // Global search: fetch each searchable module's list once (only for modules
   // this user can view), then filter client-side as they type. Avoids an API
@@ -99,6 +101,7 @@ export default function AppShell({ children, aiPanel }) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchData, setSearchData] = useState({ leads: [], accounts: [], contacts: [], quotes: [], reports: [] })
   const searchBoxRef = useRef(null)
+  const notifBoxRef = useRef(null)
 
   useEffect(() => {
     if (!companyId || isSuperAdmin) return
@@ -191,6 +194,12 @@ export default function AppShell({ children, aiPanel }) {
           const data = JSON.parse(evt.data)
           if (data.type === 'notification' && data.notification) {
             setNotifs((prev) => [data.notification, ...prev])
+            // Pop up a toast so a reminder is actually noticed in the
+            // moment, instead of only updating the bell's badge count
+            // silently until someone happens to click it open.
+            setToast(data.notification)
+            clearTimeout(toastTimerRef.current)
+            toastTimerRef.current = setTimeout(() => setToast(null), 8000)
           }
         } catch {
           // ignore malformed frames
@@ -207,6 +216,7 @@ export default function AppShell({ children, aiPanel }) {
 
     return () => {
       clearInterval(poll)
+      clearTimeout(toastTimerRef.current)
       ws?.close()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,9 +224,15 @@ export default function AppShell({ children, aiPanel }) {
 
   useEffect(() => {
     if (!notifOpen) return
-    const close = () => setNotifOpen(false)
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
+    // mousedown (not click) + a containment check, same as the search box
+    // below — a plain document 'click' listener with no target check can
+    // catch the very click that opened the dropdown (it's added mid-bubble,
+    // before that click finishes), closing it right away.
+    const close = (e) => {
+      if (notifBoxRef.current && !notifBoxRef.current.contains(e.target)) setNotifOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
   }, [notifOpen])
 
   const toggleTheme = () => {
@@ -229,6 +245,18 @@ export default function AppShell({ children, aiPanel }) {
       setNotifs((prev) => prev.map((n) => ({ ...n, is_read: true })))
     } catch {
       // best-effort
+    }
+  }
+
+  async function markOneRead(n) {
+    if (n.is_read) return
+    // Optimistic — the dropdown items had no click handler at all before, so
+    // reading one only ever updated in bulk via "Mark all read".
+    setNotifs((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)))
+    try {
+      await notificationsApi.markRead(n.id)
+    } catch {
+      // best-effort — leave it marked read locally even if the API call fails
     }
   }
 
@@ -276,6 +304,32 @@ export default function AppShell({ children, aiPanel }) {
       className={`shell ${useThemedShell ? 'ikyam-mock' : ''} ${collapsed ? 'shell-collapsed' : ''}`}
       style={{ gridTemplateColumns: aiPanel ? `${railWidth} 1fr 280px` : `${railWidth} 1fr` }}
     >
+      {toast && (
+        <div
+          className="rowx"
+          style={{
+            position: 'fixed', top: 20, right: 20, zIndex: 999, gap: 10, alignItems: 'flex-start',
+            maxWidth: 340, padding: '12px 14px', borderRadius: 12,
+            background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lift)',
+            cursor: 'pointer',
+          }}
+          onClick={() => { setToast(null); setNotifOpen(true) }}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1 }}>🔔</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <b style={{ fontSize: 12.5, display: 'block' }}>{toast.title}</b>
+            {toast.body && <div className="tiny" style={{ marginTop: 2 }}>{toast.body}</div>}
+          </div>
+          <span
+            className="tiny"
+            style={{ cursor: 'pointer', color: 'var(--mut)' }}
+            onClick={(e) => { e.stopPropagation(); setToast(null) }}
+          >
+            ✕
+          </span>
+        </div>
+      )}
+
       <aside className={`rail ${collapsed ? 'collapsed' : ''}`}>
         <div className="rail-header">
           <div className="logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -499,7 +553,7 @@ export default function AppShell({ children, aiPanel }) {
               )}
             </button>
 
-            <div style={{ position: 'relative', display: 'inline-flex' }}>
+            <div ref={notifBoxRef} style={{ position: 'relative', display: 'inline-flex' }}>
               <button
                 type="button"
                 className="icobtn"
@@ -539,7 +593,15 @@ export default function AppShell({ children, aiPanel }) {
                   </div>
                   {notifs.length === 0 && <div className="tiny" style={{ padding: '6px 6px 4px' }}>No notifications yet.</div>}
                   {notifs.slice(0, 8).map((n) => (
-                    <div key={n.id} style={{ padding: '7px 8px', borderRadius: 8, opacity: n.is_read ? 0.6 : 1 }}>
+                    <div
+                      key={n.id}
+                      onClick={() => markOneRead(n)}
+                      style={{
+                        padding: '7px 8px', borderRadius: 8, opacity: n.is_read ? 0.6 : 1,
+                        cursor: n.is_read ? 'default' : 'pointer',
+                        background: n.is_read ? 'transparent' : 'rgba(0, 114, 206, 0.06)',
+                      }}
+                    >
                       <b style={{ fontSize: 12 }}>{n.title}</b>
                       {n.body && <div className="tiny">{n.body}</div>}
                     </div>
