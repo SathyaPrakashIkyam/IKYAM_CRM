@@ -14,7 +14,9 @@ import Record from './pages/Record'
 import Accounts from './pages/Accounts'
 import Contacts from './pages/Contacts'
 import Activities from './pages/Activities'
-import Quotes from './pages/Quotes'
+import QuotesList from './pages/Quotes/QuotesList'
+import NewQuotes from './pages/Quotes/NewQuotes'
+import QuotesDetails from './pages/Quotes/QuotesDetails'
 import Products from './pages/Products'
 import ProductGroups from './pages/ProductGroups'
 import Uoms from './pages/Uoms'
@@ -50,7 +52,11 @@ function AppRoutes() {
       <Route path="/accounts/:id" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
       <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
       <Route path="/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
-      <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
+      <Route path="/quotes" element={<Navigate to="/quotesList" replace />} />
+      <Route path="/quotesList" element={<ProtectedRoute><QuotesList /></ProtectedRoute>} />
+      <Route path="/newQuotes" element={<ProtectedRoute><NewQuotes /></ProtectedRoute>} />
+      <Route path="/quotesDetails" element={<ProtectedRoute><QuotesDetails /></ProtectedRoute>} />
+      <Route path="/quotesDetails/:id" element={<ProtectedRoute><QuotesDetails /></ProtectedRoute>} />
       <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
       <Route path="/masters" element={<Navigate to="/product-groups" replace />} />
       <Route path="/product-groups" element={<ProtectedRoute companyAdminOnly><ProductGroups /></ProtectedRoute>} />

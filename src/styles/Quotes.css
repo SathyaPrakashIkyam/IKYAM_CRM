@@ -991,3 +991,134 @@
   margin-bottom: 12px;
   animation: quoteFadeIn 0.15s ease;
 }
+
+/* ==========================================================================
+   Loading Indicators & Progress Animations
+   ========================================================================== */
+
+@keyframes quoteSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes quoteProgressAnim {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes quotePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Top Card Linear Indeterminate Progress Bar */
+.quote-top-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px;
+  background: linear-gradient(90deg, #00C9A7, #0072CE, #8B5CF6, #00C9A7);
+  background-size: 300% 100%;
+  animation: quoteProgressAnim 1.8s ease infinite;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  z-index: 50;
+}
+
+/* Standalone Circular Spinner */
+.quote-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2.2px solid rgba(0, 114, 206, 0.22);
+  border-top-color: #0072CE;
+  border-radius: 50%;
+  animation: quoteSpin 0.75s linear infinite;
+  vertical-align: middle;
+}
+
+.quote-spinner.white {
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #FFFFFF;
+}
+
+.quote-spinner.xs {
+  width: 12px;
+  height: 12px;
+  border-width: 1.8px;
+}
+
+.quote-spinner.sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+.quote-spinner.lg {
+  width: 36px;
+  height: 36px;
+  border-width: 3.5px;
+}
+
+/* Centered Full-Page Loading Skeleton Card */
+.quote-loading-container {
+  max-width: 500px;
+  margin: 60px auto;
+  padding: 40px 28px;
+  background: var(--surface, #FFFFFF);
+  border: 1px solid var(--line, #E2E8F0);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  animation: quoteFadeIn 0.2s ease;
+}
+
+.quote-loading-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(0, 114, 206, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.quote-loading-icon-wrap .quote-spinner.lg {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+
+.quote-loading-title {
+  font: 700 16.5px var(--d, sans-serif);
+  color: var(--ink, #0F172A);
+  margin: 0 0 6px 0;
+}
+
+.quote-loading-sub {
+  font-size: 13px;
+  color: var(--mut, #64748B);
+  margin: 0;
+  animation: quotePulse 1.8s ease-in-out infinite;
+}
+
+/* In-table or Card Floating Loading Pill */
+.quote-loading-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px;
+  background: rgba(0, 114, 206, 0.09);
+  border: 1px solid rgba(0, 114, 206, 0.22);
+  border-radius: 14px;
+  color: #0072CE;
+  font: 600 11.5px var(--b, sans-serif);
+  animation: quoteFadeIn 0.15s ease;
+}
+

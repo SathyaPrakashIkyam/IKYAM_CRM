@@ -28,7 +28,7 @@ const ALL_NAV_ITEMS = [
   { to: '/accounts', label: 'Accounts', icon: '▣', module: 'ACCOUNTS' },
   { to: '/contacts', label: 'Contacts', icon: '◫', module: 'CONTACTS' },
   { to: '/activities', label: 'Activities', icon: '✓', module: 'ACTIVITIES' },
-  { to: '/quotes', label: 'Quotes', icon: '▥', module: 'QUOTES' },
+  { to: '/quotesList', label: 'Quotes', icon: '▥', module: 'QUOTES' },
   { to: '/reports', label: 'Reports', icon: '◧', module: 'REPORTS' },
   { to: '/dashboard', label: 'Analytics', icon: '📊', module: 'ANALYTICS' },
   { to: '/executive', label: 'Executive overview', icon: '◈', module: 'EXECUTIVE' },
@@ -104,8 +104,8 @@ export default function AppShell({ children, aiPanel }) {
     if (can('LEADS', 'view')) leadsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, leads: d }))).catch(() => {})
     if (can('ACCOUNTS', 'view')) accountsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, accounts: d }))).catch(() => {})
     if (can('CONTACTS', 'view')) contactsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, contacts: d }))).catch(() => {})
-    if (can('QUOTES', 'view')) quotesApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, quotes: d }))).catch(() => {})
-    if (can('REPORTS', 'view')) reportsApi.saved().then((d) => setSearchData((s) => ({ ...s, reports: d }))).catch(() => {})
+    // if (can('QUOTES', 'view')) quotesApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, quotes: d }))).catch(() => {})
+    // if (can('REPORTS', 'view')) reportsApi.saved().then((d) => setSearchData((s) => ({ ...s, reports: d }))).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, isSuperAdmin])
 
@@ -144,7 +144,7 @@ export default function AppShell({ children, aiPanel }) {
     const quoteMatches = searchData.quotes
       .filter((qt) => matchesQuery([qt.quote_no, qt.name, qt.status], q))
       .slice(0, 5)
-      .map((qt) => ({ id: qt.id, title: qt.quote_no || qt.name, subtitle: qt.status || '—', to: '/quotes' }))
+      .map((qt) => ({ id: qt.id, title: qt.quote_no || qt.name, subtitle: qt.status || '—', to: `/quotesDetails/${qt.id}` }))
     if (quoteMatches.length) groups.push({ label: 'Quotes', items: quoteMatches })
 
     const reportMatches = (searchData.reports || [])
@@ -176,7 +176,7 @@ export default function AppShell({ children, aiPanel }) {
 
   useEffect(() => {
     if (!isStandardUser) return
-    notificationsApi.list().then(setNotifs).catch(() => {})
+    // notificationsApi.list().then(setNotifs).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -331,7 +331,15 @@ export default function AppShell({ children, aiPanel }) {
                 key={item.to}
                 to={item.to}
                 title={collapsed ? item.label : undefined}
-                className={({ isActive }) => (isActive ? 'sel' : '')}
+                className={({ isActive }) => {
+                  if (item.to === '/quotesList' || item.to === '/quotes') {
+                    const isQuotes = ['/quotesList', '/newQuotes', '/quotesDetails', '/quotes'].some(
+                      (p) => location.pathname === p || location.pathname.startsWith(p + '/')
+                    )
+                    return isQuotes ? 'sel' : ''
+                  }
+                  return isActive ? 'sel' : ''
+                }}
               >
                 <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
                 {!collapsed && <span>{item.label}</span>}
@@ -376,7 +384,7 @@ export default function AppShell({ children, aiPanel }) {
               onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true) }}
               onFocus={() => searchQuery && setSearchOpen(true)}
               onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); e.target.blur() } }}
-              placeholder="Search leads, accounts, quotes, reports…"
+              placeholder="Search leads, accounts and quotes"
               style={{
                 flex: 1, border: 'none', outline: 'none', background: 'transparent',
                 fontSize: 13, color: 'var(--ink)', font: '500 13px var(--b, inherit)',

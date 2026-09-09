@@ -98,16 +98,10 @@ export const opportunitiesApi = {
 export const quotesApi = {
   list: (companyId) => api.get('/quotes', { params: { company_id: companyId } }).then((r) => r.data),
   create: (companyId, body) => api.post('/quotes', body, { params: { company_id: companyId } }).then((r) => r.data),
-    update: (companyId, id, body) =>
-    api.put(`/quotes/${id}`, body, { params: { company_id: companyId } })
-      .catch((err) => {
-        if (err?.response?.status === 405) {
-          return api.patch(`/quotes/${id}`, body, { params: { company_id: companyId } })
-        }
-        throw err
-      })
-      .then((r) => r?.data || r),
-  get: (id) => api.get(`/quotes/${id}`).then((r) => r.data),
+  update: (companyId, id, body) => api.patch(`/quotes/${id}`, body, { params: { company_id: companyId } }).then((r) => r?.data || r),
+  get: (id, companyId) => api.get(`/quotes/${id}`, { params: companyId ? { company_id: companyId } : {} }).then((r) => r.data),
+  getRevision: (id, revision, companyId) =>
+    api.get(`/quotes/${id}/revision/${revision}`, { params: companyId ? { company_id: companyId } : {} }).then((r) => r.data),
   send: (id) => api.post(`/quotes/${id}/send`).then((r) => r.data),
   markAccepted: (id) => api.post(`/quotes/${id}/mark-accepted`).then((r) => r.data),
   taxCodes: () => api.get('/quotes/meta/tax-codes').then((r) => r.data),
@@ -140,6 +134,8 @@ export const priceListsApi = {
   list: (companyId) => api.get('/price-lists', { params: { company_id: companyId } }).then((r) => r.data),
   create: (companyId, body) => api.post('/price-lists', body, { params: { company_id: companyId } }).then((r) => r.data),
   items: (priceListId) => api.get(`/price-lists/${priceListId}/items`).then((r) => r.data),
+  getItemBySku: (priceListId, sku) =>
+    api.get(`/price-lists/${priceListId}/items/by-sku/${encodeURIComponent(sku)}`).then((r) => r.data),
   setItem: (priceListId, body) => api.post(`/price-lists/${priceListId}/items`, body).then((r) => r.data),
   removeItem: (priceListId, productId) => api.delete(`/price-lists/${priceListId}/items/${productId}`),
 }

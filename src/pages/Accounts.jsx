@@ -201,9 +201,19 @@ export default function Accounts() {
                     <div>
                       <div className="lab">Quotes ({related.quotes.length})</div>
                       {related.quotes.map((q) => (
-                        <div className="card hov" key={q.id} style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }} onClick={() => navigate('/quotes')}>
+                        <div
+                          className="card hov"
+                          key={q.id}
+                          style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }}
+                          onClick={() => navigate(`/quotesDetails/${q.id}`, { state: { id: q.id, quote: q } })}
+                        >
                           <b style={{ fontSize: 12 }}>{q.doc_num}</b>
-                          <div className="tiny">₹{q.total.toLocaleString('en-IN')} · {q.status}</div>
+                          <div className="tiny">
+                            ₹{Number(q.total || 0).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })} · {q.status}
+                          </div>
                         </div>
                       ))}
                       {related.quotes.length === 0 && <div className="tiny" style={{ marginTop: 6 }}>None yet.</div>}

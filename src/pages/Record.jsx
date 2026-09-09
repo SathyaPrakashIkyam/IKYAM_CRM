@@ -155,7 +155,7 @@ export default function Record() {
               </div>
               <div className="rowx" style={{ flexWrap: 'wrap' }}>
                 <button className="btn ghost" style={{ fontWeight: 700 }} onClick={focusActivityForm}>Log activity</button>
-                <button className="btn ghost" style={{ fontWeight: 700 }} onClick={() => navigate('/quotes')}>New quote</button>
+                <button className="btn ghost" style={{ fontWeight: 700 }} onClick={() => navigate('/newQuotes')}>New quote</button>
                 {opp.status === 'open' && (
                   <>
                     <button className="btn pri" onClick={() => closeDeal('won')}>Mark won</button>
@@ -271,7 +271,16 @@ export default function Record() {
 
               <div className="lab" style={{ marginTop: 12 }}>Related</div>
               <div className="card" style={{ padding: '4px 10px', marginTop: 8 }}>
-                <div className="rec-related-row" onClick={() => navigate('/quotes')}>
+                <div
+                  className="rec-related-row"
+                  onClick={() =>
+                    relatedQuotes[0]
+                      ? navigate(`/quotesDetails/${relatedQuotes[0].id}`, {
+                          state: { id: relatedQuotes[0].id, quote: relatedQuotes[0] },
+                        })
+                      : navigate('/quotesList')
+                  }
+                >
                   <span className="tiny">Quotes</span>
                   <b className="tiny">{relatedQuotes.length}{relatedQuotes[0] ? ` — ${relatedQuotes[0].doc_num}` : ''}</b>
                 </div>

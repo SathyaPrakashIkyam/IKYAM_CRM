@@ -22,6 +22,8 @@ export default function CustomSelect({
   style = {},
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [openUpward, setOpenUpward] = useState(false)
+  const [dropdownMaxHeight, setDropdownMaxHeight] = useState(200)
   const containerRef = useRef(null)
 
   // Close dropdown on click outside
@@ -34,6 +36,29 @@ export default function CustomSelect({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Auto-detect whether dropdown should open upwards or downwards, constraining inside container
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      const modalParent = containerRef.current.closest(
+        '.lead-modal-card, .activity-modal-dialog, [role="dialog"], .modal-card'
+      )
+      const bottomBoundary = modalParent ? modalParent.getBoundingClientRect().bottom : window.innerHeight
+      const topBoundary = modalParent ? modalParent.getBoundingClientRect().top : 0
+
+      const spaceBelow = bottomBoundary - rect.bottom - 12
+      const spaceAbove = rect.top - topBoundary - 12
+
+      if (spaceBelow < 190 && spaceAbove > spaceBelow) {
+        setOpenUpward(true)
+        setDropdownMaxHeight(Math.max(100, Math.min(220, Math.floor(spaceAbove - 16))))
+      } else {
+        setOpenUpward(false)
+        setDropdownMaxHeight(Math.max(100, Math.min(220, Math.floor(spaceBelow - 16))))
+      }
+    }
+  }, [isOpen])
 
   // Helper to determine if an option value is selected
   function isSelected(optValue) {
@@ -104,6 +129,9 @@ export default function CustomSelect({
     <div
       className={`custom-select-container ${isOpen ? 'open' : ''} ${className}`}
       ref={containerRef}
+      style={{
+        ...(style?.width ? { width: style.width } : {}),
+      }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
@@ -130,8 +158,8 @@ export default function CustomSelect({
       </button>
 
       {isOpen && (
-        <div className="custom-select-dropdown">
-          <div className="custom-select-options-list">
+        <div className={`custom-select-dropdown ${openUpward ? 'drop-up' : ''}`}>
+          <div className="custom-select-options-list" style={{ maxHeight: dropdownMaxHeight }}>
             {options.map((opt) => {
               const active = isSelected(opt.value)
               return (
