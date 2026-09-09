@@ -74,10 +74,17 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
-    authApi.logout().catch(() => {})
-    clearAuth()
-    setAuth(null)
-    setCompanies([])
+    // The request interceptor reads the token from storage as an async
+    // microtask, so clearing it synchronously right here (as this used to)
+    // races ahead of that read — the logout call goes out with no
+    // Authorization header at all, and the backend correctly 401s it. Clear
+    // local state only after the call has actually gone out (success or
+    // not — it's still a fire-and-forget from the UI's perspective).
+    authApi.logout().catch(() => {}).finally(() => {
+      clearAuth()
+      setAuth(null)
+      setCompanies([])
+    })
   }
 
   function switchCompany(id) {
