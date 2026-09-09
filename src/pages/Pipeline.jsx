@@ -29,6 +29,19 @@ function probChip(p) {
   return 'risk'
 }
 
+const LOST_REASONS = [
+  { value: '', label: 'Select a reason (or type custom below)...' },
+  { value: 'Price / Budget constraint', label: 'Price / Budget constraint' },
+  { value: 'Competitor chosen', label: 'Competitor chosen' },
+  { value: 'Product / Feature mismatch', label: 'Product / Feature mismatch' },
+  { value: 'Project postponed / delayed', label: 'Project postponed / delayed' },
+  { value: 'Project cancelled', label: 'Project cancelled' },
+  { value: 'Unresponsive / Contact lost', label: 'Unresponsive / Contact lost' },
+  { value: 'Decision maker changed', label: 'Decision maker changed' },
+  { value: 'Timing / Not ready', label: 'Timing / Not ready' },
+  { value: 'other', label: 'Other (specify below)' },
+]
+
 export default function Pipeline() {
   const [columns, setColumns] = useState([])
   const [view, setView] = useState('board') // board | table | forecast
@@ -37,6 +50,7 @@ export default function Pipeline() {
   const [dragCard, setDragCard] = useState(null) // { id, fromStageId }
   const [dragOverStage, setDragOverStage] = useState(null)
   const [lostPrompt, setLostPrompt] = useState(null) // { cardId, toStageId }
+  const [selectedReason, setSelectedReason] = useState('')
   const [lostReasonText, setLostReasonText] = useState('')
   const [lostReasonError, setLostReasonError] = useState('')
   const navigate = useNavigate()
@@ -109,6 +123,7 @@ export default function Pipeline() {
   function requestMoveCard(cardId, toStageId) {
     const targetStage = allStages.find((s) => s.id === toStageId)
     if (targetStage?.stage_kind === 'lost') {
+      setSelectedReason('')
       setLostReasonText('')
       setLostReasonError('')
       setLostPrompt({ cardId, toStageId })
@@ -118,18 +133,29 @@ export default function Pipeline() {
   }
 
   async function confirmLostReason() {
-    if (!lostReasonText.trim()) {
-      setLostReasonError('Please provide a reason for changing this Lead to Lost.')
+    let finalReason = ''
+    const custom = lostReasonText.trim()
+
+    if (selectedReason && selectedReason !== 'other') {
+      finalReason = custom ? `${selectedReason} — ${custom}` : selectedReason
+    } else {
+      finalReason = custom
+    }
+
+    if (!finalReason) {
+      setLostReasonError('Please select a reason from the dropdown or enter one manually.')
       return
     }
-    await moveCard(lostPrompt.cardId, lostPrompt.toStageId, lostReasonText.trim())
+    await moveCard(lostPrompt.cardId, lostPrompt.toStageId, finalReason)
     setLostPrompt(null)
+    setSelectedReason('')
     setLostReasonText('')
     setLostReasonError('')
   }
 
   function cancelLostReason() {
     setLostPrompt(null)
+    setSelectedReason('')
     setLostReasonText('')
     setLostReasonError('')
   }
@@ -419,34 +445,85 @@ export default function Pipeline() {
 
         {lostPrompt && (
           <div className="lead-modal-overlay" onClick={cancelLostReason}>
-            <div className="lead-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="lead-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
               <div className="lead-modal-header">
                 <div className="lead-modal-title-row">
-                  <div className="lead-modal-icon-badge">⚠</div>
+                  <div className="lead-modal-icon-badge" style={{ color: '#d64545', background: 'rgba(214, 69, 69, 0.12)' }}>
+                    ⚠
+                  </div>
                   <div>
                     <h3>Mark as Lost</h3>
-                    <span className="tiny mut">A reason is required before this deal can be marked lost</span>
+                    <span className="tiny mut">Select a reason or enter custom details</span>
                   </div>
                 </div>
                 <button type="button" className="lead-modal-close" onClick={cancelLostReason}>✕</button>
               </div>
               <div className="title-bar" style={{ margin: '0 0 20px 0', width: 44, height: 3 }} />
 
-              <label className="lead-modal-label">Reason *</label>
-              <textarea
-                autoFocus
-                rows={3}
-                placeholder="e.g. Went with a competitor on price"
-                className="lead-modal-input"
-                style={{ resize: 'vertical', fontFamily: 'inherit' }}
-                value={lostReasonText}
-                onChange={(e) => { setLostReasonText(e.target.value); if (lostReasonError) setLostReasonError('') }}
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label className="lead-modal-label">Select reason</label>
+                  <CustomSelect
+                    options={LOST_REASONS}
+                    value={selectedReason}
+                    onChange={(val) => {
+                      setSelectedReason(val)
+                      if (lostReasonError) setLostReasonError('')
+                    }}
+                    placeholder="Choose a common reason..."
+                    className="lead-modal-custom-select"
+                  />
+                </div>
+
+                <div>
+                  <div className="rowx sp" style={{ marginBottom: 6 }}>
+                    <label className="lead-modal-label" style={{ margin: 0 }}>
+                      {selectedReason && selectedReason !== 'other'
+                        ? 'Additional details (optional)'
+                        : 'Reason description *'}
+                    </label>
+                    {selectedReason && (
+                      <span
+                        className="tiny mut"
+                        style={{ fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
+                        onClick={() => setSelectedReason('')}
+                      >
+                        Clear selection
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    autoFocus={!selectedReason}
+                    rows={3}
+                    placeholder={
+                      selectedReason && selectedReason !== 'other'
+                        ? 'Add specific notes or context (optional)...'
+                        : 'e.g. Went with a competitor on price or project was cancelled...'
+                    }
+                    className="lead-modal-input"
+                    style={{
+                      height: 'auto',
+                      minHeight: 74,
+                      padding: '10px 16px',
+                      borderRadius: 16,
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                      lineHeight: 1.4,
+                    }}
+                    value={lostReasonText}
+                    onChange={(e) => {
+                      setLostReasonText(e.target.value)
+                      if (lostReasonError) setLostReasonError('')
+                    }}
+                  />
+                </div>
+              </div>
+
               {lostReasonError && (
                 <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginTop: 10 }}>{lostReasonError}</div>
               )}
 
-              <div className="lead-modal-actions">
+              <div className="lead-modal-actions" style={{ marginTop: 20 }}>
                 <button type="button" className="btn ghost lead-modal-cancel-btn" onClick={cancelLostReason}>
                   Cancel
                 </button>
