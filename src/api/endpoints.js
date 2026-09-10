@@ -154,6 +154,8 @@ export const activitiesApi = {
       })
       .then((r) => r.data),
   reopen: (id) => api.post(`/activities/${id}/reopen`).then((r) => r.data),
+  getDocumentsByLeadId: (leadId) =>
+    api.get(`/activities/get_documents_by_lead_id/${leadId}`).then((r) => r.data),
 }
 
 export const dashboardApi = {

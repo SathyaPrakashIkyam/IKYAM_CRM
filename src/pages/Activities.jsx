@@ -89,6 +89,81 @@ export default function Activities() {
   const [completeAttachments, setCompleteAttachments] = useState([])
   const [completeError, setCompleteError] = useState('')
   const [submittingComplete, setSubmittingComplete] = useState(false)
+  const [previewModal, setPreviewModal] = useState(null)
+
+  async function handleOpenPreview(activity, preferredFileName) {
+    const leadId =
+      activity.lead_id ||
+      (activity.related_object_type === 'lead' ? activity.related_record_id : null) ||
+      leads.find((l) => l.id === activity.lead_id || l.id === activity.related_record_id)?.id
+
+    if (!leadId) {
+      setPreviewModal({
+        open: true,
+        loading: false,
+        error: 'No associated lead found for this activity to fetch documents preview.',
+        activity,
+        files: [],
+        activeFileIndex: 0,
+      })
+      return
+    }
+
+    setPreviewModal({
+      open: true,
+      loading: true,
+      error: '',
+      activity,
+      files: [],
+      activeFileIndex: 0,
+    })
+
+    try {
+      const res = await activitiesApi.getDocumentsByLeadId(leadId)
+      const docs = Array.isArray(res?.documents) ? res.documents : []
+      const matchingDoc = docs.find((d) => d.activity_id === activity.id) || docs[0]
+      let files = matchingDoc?.files || []
+      if (!files.length && docs.length > 0) {
+        files = docs.flatMap((d) => d.files || [])
+      }
+
+      if (!files.length) {
+        setPreviewModal((prev) => ({
+          ...prev,
+          loading: false,
+          error: 'No document files returned for this lead.',
+          files: [],
+        }))
+        return
+      }
+
+      let activeIndex = 0
+      if (preferredFileName) {
+        const foundIdx = files.findIndex((f) => f.file_name === preferredFileName)
+        if (foundIdx !== -1) activeIndex = foundIdx
+      }
+
+      setPreviewModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: '',
+        files,
+        activeFileIndex: activeIndex,
+      }))
+    } catch (err) {
+      console.error('Failed to fetch lead documents for preview:', err)
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.detail ||
+        'Failed to load document preview.'
+      setPreviewModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: typeof msg === 'string' ? msg : JSON.stringify(msg),
+        files: [],
+      }))
+    }
+  }
 
   function openCompleteModal(activity) {
     setCompleteTarget(activity)
@@ -210,6 +285,7 @@ export default function Activities() {
               items={overdue}
               leads={leads}
               onComplete={openCompleteModal}
+              onOpenPreview={handleOpenPreview}
               tone="risk"
             />
             <ActivitySection
@@ -218,6 +294,7 @@ export default function Activities() {
               items={open}
               leads={leads}
               onComplete={openCompleteModal}
+              onOpenPreview={handleOpenPreview}
             />
             <ActivitySection
               title="Completed"
@@ -225,6 +302,7 @@ export default function Activities() {
               items={done}
               leads={leads}
               onComplete={openCompleteModal}
+              onOpenPreview={handleOpenPreview}
               isDone
             />
             {activities.length === 0 && (
@@ -613,12 +691,233 @@ export default function Activities() {
             </div>
           </div>
         )}
+
+        {/* Preview Modal for Activity Documents */}
+        {previewModal?.open && (
+          <div className="lead-modal-overlay" onClick={() => setPreviewModal(null)}>
+            <div
+              className="lead-modal-card"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                maxWidth: 780,
+                width: '92vw',
+                maxHeight: '88vh',
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: 24,
+                padding: '24px 28px',
+              }}
+            >
+              <div className="lead-modal-header" style={{ marginBottom: 12 }}>
+                <div className="lead-modal-title-row">
+                  <div
+                    className="lead-modal-icon-badge"
+                    style={{
+                      color: '#0072CE',
+                      background: 'rgba(0, 114, 206, 0.12)',
+                      fontSize: 18,
+                    }}
+                  >
+                    👁
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Attachment Preview</h3>
+                    <span className="tiny mut">
+                      {previewModal.activity?.subject || 'Activity Documents'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="lead-modal-close"
+                  onClick={() => setPreviewModal(null)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="title-bar" style={{ margin: '0 0 16px 0', width: 44, height: 3 }} />
+
+              {previewModal.loading && (
+                <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+                  <div
+                    className="onboarding-spinner"
+                    style={{
+                      width: 32,
+                      height: 32,
+                      border: '3px solid rgba(0, 201, 167, 0.2)',
+                      borderTopColor: '#00C9A7',
+                      borderRadius: '50%',
+                      display: 'inline-block',
+                      marginBottom: 12,
+                    }}
+                  />
+                  <div style={{ font: '600 13.5px var(--b)', color: 'var(--ink)' }}>
+                    Loading document preview…
+                  </div>
+                  <span className="tiny mut">Fetching files from server</span>
+                </div>
+              )}
+
+              {previewModal.error && (
+                <div style={{ padding: '24px', textAlign: 'center' }}>
+                  <div
+                    className="tiny"
+                    style={{
+                      color: 'var(--danger, #d64545)',
+                      background: 'rgba(214, 69, 69, 0.08)',
+                      padding: 14,
+                      borderRadius: 12,
+                    }}
+                  >
+                    ⚠ {previewModal.error}
+                  </div>
+                </div>
+              )}
+
+              {!previewModal.loading && !previewModal.error && previewModal.files.length > 0 && (() => {
+                const currentFile = previewModal.files[previewModal.activeFileIndex] || previewModal.files[0]
+                const fileSrc = getFileSrc(currentFile)
+                const isImage =
+                  currentFile.mime_type?.startsWith('image/') ||
+                  /\.(png|jpe?g|webp|gif|svg)$/i.test(currentFile.file_name)
+                const isPdf =
+                  currentFile.mime_type === 'application/pdf' ||
+                  /\.pdf$/i.test(currentFile.file_name)
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                    {/* File Tabs when multiple */}
+                    {previewModal.files.length > 1 && (
+                      <div
+                        className="rowx"
+                        style={{
+                          gap: 8,
+                          marginBottom: 14,
+                          overflowX: 'auto',
+                          paddingBottom: 6,
+                        }}
+                      >
+                        {previewModal.files.map((file, fIdx) => (
+                          <button
+                            key={fIdx}
+                            type="button"
+                            className={`actchip ${previewModal.activeFileIndex === fIdx ? 'on' : ''}`}
+                            style={{ padding: '5px 14px', fontSize: 12, borderRadius: 16 }}
+                            onClick={() =>
+                              setPreviewModal((prev) => ({ ...prev, activeFileIndex: fIdx }))
+                            }
+                          >
+                            📄 {file.file_name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Preview Viewer Box */}
+                    <div
+                      style={{
+                        flex: 1,
+                        minHeight: 280,
+                        maxHeight: '52vh',
+                        background: 'var(--surface2, rgba(240, 246, 250, 0.6))',
+                        border: '1px solid var(--line, rgba(0, 201, 167, 0.2))',
+                        borderRadius: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'auto',
+                        padding: 12,
+                      }}
+                    >
+                      {isImage && (
+                        <img
+                          src={fileSrc}
+                          alt={currentFile.file_name}
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '48vh',
+                            objectFit: 'contain',
+                            borderRadius: 10,
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+                          }}
+                        />
+                      )}
+
+                      {isPdf && (
+                        <iframe
+                          src={fileSrc}
+                          title={currentFile.file_name}
+                          style={{
+                            width: '100%',
+                            height: '48vh',
+                            border: 'none',
+                            borderRadius: 10,
+                          }}
+                        />
+                      )}
+
+                      {!isImage && !isPdf && (
+                        <div style={{ textAlign: 'center', padding: 32 }}>
+                          <span style={{ fontSize: 44, display: 'block', marginBottom: 12 }}>📄</span>
+                          <b style={{ fontSize: 15, color: 'var(--ink)' }}>{currentFile.file_name}</b>
+                          <div className="tiny mut" style={{ marginTop: 4 }}>
+                            {currentFile.mime_type || 'File preview not directly viewable'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer Controls */}
+                    <div className="rowx sp" style={{ marginTop: 16, alignItems: 'center' }}>
+                      <div className="tiny mut">
+                        <b>{currentFile.file_name}</b>{' '}
+                        {currentFile.mime_type && `· ${currentFile.mime_type}`}
+                      </div>
+                      <div className="rowx" style={{ gap: 10 }}>
+                        <a
+                          href={fileSrc}
+                          download={currentFile.file_name}
+                          className="btn pri"
+                          style={{
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          ⬇ Download File
+                        </a>
+                        <button
+                          type="button"
+                          className="btn ghost"
+                          onClick={() => setPreviewModal(null)}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   )
 }
 
-function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone, isDone }) {
+function ActivitySection({
+  title,
+  badgeText,
+  items,
+  leads = [],
+  onComplete,
+  onOpenPreview,
+  tone,
+  isDone,
+}) {
   if (items.length === 0) return null
   return (
     <div className="activity-section">
@@ -630,8 +929,12 @@ function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone
         {items.map((a) => {
           const linkedLead = leads.find((l) => l.id === a.lead_id || l.id === a.related_record_id)
           const leadDisplayName = linkedLead
-            ? ([linkedLead.first_name, linkedLead.last_name].filter(Boolean).join(' ') || linkedLead.name || linkedLead.company_name)
+            ? [linkedLead.first_name, linkedLead.last_name].filter(Boolean).join(' ') ||
+              linkedLead.name ||
+              linkedLead.company_name
             : a.lead_name || (a.entity_type === 'lead' ? 'Lead' : null)
+
+          const attachedFiles = parseAttachmentsList(a.attachments)
 
           return (
             <div className={`card hov activity-card ${isDone ? 'done' : ''}`} key={a.id}>
@@ -649,44 +952,109 @@ function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone
                     <b className={`activity-subject ${a.status === 'completed' ? 'completed' : ''}`}>
                       {a.subject}
                     </b>
-                    <div className="rowx" style={{ gap: 8, marginTop: 3, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span className="tiny mut" style={{ textTransform: 'capitalize' }}>{a.activity_type}</span>
+                    <div
+                      className="rowx"
+                      style={{ gap: 8, marginTop: 3, alignItems: 'center', flexWrap: 'wrap' }}
+                    >
+                      <span className="tiny mut" style={{ textTransform: 'capitalize' }}>
+                        {a.activity_type}
+                      </span>
                       {leadDisplayName && (
-                        <span className="chip" style={{ fontSize: 10.5, padding: '1px 7px', background: 'rgba(0, 114, 206, 0.08)', color: '#0072CE', fontWeight: 600 }}>
+                        <span
+                          className="chip"
+                          style={{
+                            fontSize: 10.5,
+                            padding: '1px 7px',
+                            background: 'rgba(0, 114, 206, 0.08)',
+                            color: '#0072CE',
+                            fontWeight: 600,
+                          }}
+                        >
                           👤 {leadDisplayName}
                         </span>
                       )}
-                      {a.entity_type && !leadDisplayName && <span className="tiny mut">· {a.entity_type}</span>}
+                      {a.entity_type && !leadDisplayName && (
+                        <span className="tiny mut">· {a.entity_type}</span>
+                      )}
                     </div>
-                    {/* Display Summary / Outcome if present */}
+
+                    {/* Summary Section */}
                     {(a.summary || a.outcome) && (
-                      <p className="tiny mut" style={{ marginTop: 5, fontStyle: 'italic', maxWidth: 650, lineHeight: 1.4 }}>
-                        “{a.summary || a.outcome}”
-                      </p>
+                      <div
+                        style={{
+                          marginTop: 8,
+                          background: 'rgba(0, 201, 167, 0.07)',
+                          borderLeft: '3px solid var(--primary, #00C9A7)',
+                          padding: '6px 12px',
+                          borderRadius: '0 10px 10px 0',
+                          maxWidth: 700,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            color: 'var(--primary, #00C9A7)',
+                            letterSpacing: 0.4,
+                            display: 'block',
+                            marginBottom: 2,
+                          }}
+                        >
+                          Summary
+                        </span>
+                        <p style={{ margin: 0, fontSize: 13, color: 'var(--ink)', lineHeight: 1.45 }}>
+                          {a.summary || a.outcome}
+                        </p>
+                      </div>
                     )}
-                    {/* Display Attachments if present */}
-                    {Array.isArray(a.attachments) && a.attachments.length > 0 && (
-                      <div className="rowx" style={{ gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
-                        {a.attachments.map((att, attIdx) => {
-                          const name = typeof att === 'string' ? att.split('/').pop() : att.file_name || att.name || 'Attachment'
-                          const url = typeof att === 'string' ? att : att.url || att.file_url
-                          return url ? (
-                            <a
+
+                    {/* Attachments Section with Preview */}
+                    {attachedFiles.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div className="rowx" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span className="tiny mut" style={{ fontWeight: 600 }}>
+                            Attachments ({attachedFiles.length}):
+                          </span>
+                          {attachedFiles.map((att, attIdx) => (
+                            <span
                               key={attIdx}
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
                               className="chip"
-                              style={{ fontSize: 11, padding: '2px 8px', textDecoration: 'none', color: 'var(--primary, #00C9A7)' }}
+                              style={{
+                                fontSize: 11.5,
+                                padding: '3px 10px',
+                                background: 'var(--surface2, rgba(240, 246, 250, 0.9))',
+                                border: '1px solid var(--line, rgba(0, 201, 167, 0.25))',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                              onClick={() => onOpenPreview(a, att.name)}
+                              title="Click to preview attachment"
                             >
-                              📎 {name}
-                            </a>
-                          ) : (
-                            <span key={attIdx} className="chip" style={{ fontSize: 11, padding: '2px 8px' }}>
-                              📎 {name}
+                              📎 {att.name}
                             </span>
-                          )
-                        })}
+                          ))}
+                          <button
+                            type="button"
+                            className="btn ghost"
+                            style={{
+                              padding: '3px 10px',
+                              fontSize: 11.5,
+                              height: 26,
+                              borderRadius: 14,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              color: 'var(--primary, #00C9A7)',
+                              borderColor: 'var(--primary, #00C9A7)',
+                            }}
+                            onClick={() => onOpenPreview(a)}
+                          >
+                            👁 Preview
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -695,7 +1063,11 @@ function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone
                 <div className="rowx" style={{ gap: 10 }}>
                   {a.due_at && (
                     <span className={`chip ${tone === 'risk' ? 'danger' : 'warn'}`}>
-                      {new Date(a.due_at).toLocaleDateString()} {new Date(a.due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(a.due_at).toLocaleDateString()}{' '}
+                      {new Date(a.due_at).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
                   )}
                   {a.status === 'open' && (
@@ -717,6 +1089,38 @@ function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone
   )
 }
 
+function parseAttachmentsList(attachments) {
+  if (!attachments) return []
+  let list = []
+  if (Array.isArray(attachments)) {
+    list = attachments
+  } else if (typeof attachments === 'string') {
+    list = attachments
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  return list.map((item) => {
+    if (typeof item === 'string') {
+      const fileName = item.split(/[/\\]/).pop() || item
+      return { path: item, name: fileName }
+    }
+    return {
+      path: item.path || item.url || '',
+      name: item.file_name || item.name || 'Attachment',
+    }
+  })
+}
+
+function getFileSrc(file) {
+  if (!file || !file.base64_data) return ''
+  if (file.base64_data.startsWith('data:')) {
+    return file.base64_data
+  }
+  const mime = file.mime_type || 'application/octet-stream'
+  return `data:${mime};base64,${file.base64_data}`
+}
+
 function formatFileSize(bytes) {
   if (!bytes) return '0 B'
   const k = 1024
@@ -728,4 +1132,5 @@ function formatFileSize(bytes) {
 function typeIcon(type) {
   return { call: '☎', task: '✓', meeting: '📅', email: '✉' }[type] || '⚡'
 }
+
 
