@@ -125,11 +125,12 @@ export default function Onboarding() {
     setSaving(true)
     try {
       let onboardingId = form.onboard_company_id
+      let submitResult = null
       if (isEditMode && onboardingId) {
         await onboardingApi.updateCompanyDetails(onboardingId, form)
       } else {
-        const res = await onboardingApi.addCompanyDetails(form)
-        onboardingId = res?.onboard_company_id || res?.data?.onboard_company_id || res?.id || onboardingId
+        submitResult = await onboardingApi.addCompanyDetails(form)
+        onboardingId = submitResult?.onboard_company_id || submitResult?.data?.onboard_company_id || submitResult?.id || onboardingId
       }
 
       if (logoFile && onboardingId) {
@@ -142,10 +143,15 @@ export default function Onboarding() {
         }
       }
 
+      // A Super Admin's own submission auto-approves server-side (see
+      // add_company_details) — reflect that instead of the generic
+      // "submitted" message, which would wrongly imply it's still pending.
       setSuccess(
         isEditMode
           ? 'Onboarding details & logo updated successfully!'
-          : 'Onboarding company details & logo submitted successfully!'
+          : submitResult?.is_approved
+            ? 'Company onboarded and approved — workspace is active!'
+            : 'Onboarding company details & logo submitted successfully!'
       )
       setTimeout(() => {
         if (isSuperAdmin) {
