@@ -78,6 +78,15 @@ export default function Record() {
       subject: text,
       related_object_type: 'opportunity',
       related_record_id: id,
+      // Activities on a deal page were never getting a lead_id at all —
+      // only linked to the opportunity via activity_links — so they never
+      // showed up under GET /activities/get_documents_by_lead_id/{lead_id}
+      // even after completing them with a summary/attachment. Deals
+      // converted from a lead carry that lead's id as source_lead_id; pass
+      // it through so this activity is attributed to that lead too. A deal
+      // created directly (no source lead) still gets lead_id: undefined,
+      // same as before.
+      lead_id: opp.source_lead_id || undefined,
     })
 
     // Meeting/email activities redirect straight into the logged-in user's
