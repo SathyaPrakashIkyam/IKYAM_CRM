@@ -3,9 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { accountsApi } from '../api/endpoints'
-import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
 import '../styles/Accounts.css'
+import { useAuth } from '../context/AuthContext'
 
 const INDUSTRY_OPTIONS = [
   { value: '', label: 'Select industry...' },
@@ -31,7 +31,7 @@ export default function Accounts() {
   const [newAccount, setNewAccount] = useState({ name: '', industry: '' })
   const navigate = useNavigate()
   const location = useLocation()
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
 
   function load() {
     if (!companyId) return

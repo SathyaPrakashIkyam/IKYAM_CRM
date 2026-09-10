@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { settingsApi, aiChatApi, currenciesApi } from '../api/endpoints'
-import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
 import '../styles/Settings.css'
 import '../styles/Masters.css'
+import { useAuth } from '../context/AuthContext'
 
 const TABS = [
   { key: 'general', label: '⚙ General', desc: 'Workspace name, default currency & timezones' },
@@ -109,7 +109,7 @@ export default function Settings() {
    Panel 1: General Settings
    ========================================================================== */
 function GeneralPanel() {
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
   const [form, setForm] = useState({ workspace_name: '', default_currency: 'INR', timezone: 'Asia/Kolkata' })
   const [currencies, setCurrencies] = useState([])
   const [loading, setLoading] = useState(true)
@@ -816,6 +816,16 @@ function AiAssistantPanel() {
     }
   }
 
+  async function remove(id) {
+    if (!window.confirm('Permanently delete this API key? This cannot be undone.')) return
+    try {
+      await aiChatApi.deleteKey(id)
+      load()
+    } catch (err) {
+      console.error('Failed to delete key:', err)
+    }
+  }
+
   const activeCount = keys.filter((k) => k.is_active).length
 
   return (
@@ -875,7 +885,7 @@ function AiAssistantPanel() {
                 </div>
               </div>
 
-              {k.is_active && (
+              {k.is_active ? (
                 <button
                   type="button"
                   className="btn ghost"
@@ -889,6 +899,21 @@ function AiAssistantPanel() {
                   onClick={() => deactivate(k.global_key_id)}
                 >
                   Deactivate
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 14,
+                    fontSize: 12,
+                    color: '#EF4444',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                  }}
+                  onClick={() => remove(k.global_key_id)}
+                >
+                  🗑 Delete
                 </button>
               )}
             </div>

@@ -143,8 +143,28 @@ export const priceListsApi = {
 export const activitiesApi = {
   list: (companyId, params) =>
     api.get('/activities', { params: { company_id: companyId, ...params } }).then((r) => r.data),
-  create: (companyId, body) =>
-    api.post('/activities', body, { params: { company_id: companyId } }).then((r) => r.data),
+  // body is a plain object of ActivityCreate fields; body.attachments (if
+  // present) is an array of File objects — the route takes multipart Form
+  // fields (not JSON) so a file upload can ride along with the same
+  // request, same reason /complete below is multipart.
+  create: (companyId, body) => {
+    const { attachments, ...fields } = body || {}
+    const formData = new FormData()
+    for (const [key, value] of Object.entries(fields)) {
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, value)
+      }
+    }
+    for (const file of attachments || []) {
+      formData.append('attachments', file)
+    }
+    return api
+      .post('/activities', formData, {
+        params: { company_id: companyId },
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data)
+  },
   forRecord: (objectType, recordId) =>
     api.get(`/activities/for/${objectType}/${recordId}`).then((r) => r.data),
   complete: (id, formData) =>
@@ -219,6 +239,10 @@ export const aiChatApi = {
     api.post('/ai/keys', { gemini_api_key, ...(schemaId ? { schema_id: schemaId } : {}) }).then((r) => r.data),
   deactivateKey: (id, schemaId) =>
     api.delete(`/ai/keys/${id}`, { params: schemaId ? { schema_id: schemaId } : {} }),
+  // Permanent, not reversible — only allowed once the key is already
+  // deactivated (the backend rejects deleting a still-active one).
+  deleteKey: (id, schemaId) =>
+    api.delete(`/ai/keys/${id}/permanent`, { params: schemaId ? { schema_id: schemaId } : {} }),
   sessions: () => api.get('/ai/chat/sessions').then((r) => r.data),
   history: (sessionId) => api.get('/ai/chat/history', { params: { session_id: sessionId } }).then((r) => r.data),
 }

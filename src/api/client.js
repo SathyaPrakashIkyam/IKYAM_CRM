@@ -1,7 +1,7 @@
 import axios from 'axios'
 
-const API_BASE_URL = 'https://products.ikyam.in/crm_api'
-// const API_BASE_URL = 'http://localhost:8000/crm_api'
+// const API_BASE_URL = 'https://products.ikyam.in/crm_api'
+const API_BASE_URL = 'http://localhost:8000/crm_api'
 export const api = axios.create({ baseURL: API_BASE_URL })
 export const WS_BASE_URL = API_BASE_URL.replace(/^https/, 'wss')
 
@@ -17,6 +17,13 @@ export function storeAuth(auth) {
 export function clearAuth() {
   localStorage.removeItem('ikyam_auth')
   localStorage.removeItem('ikyam_company_id')
+  // The AI chat widget's session id lives in sessionStorage, which survives
+  // a logout/login in the same tab — without clearing it here, a second
+  // account logging into the same tab would reuse the first account's chat
+  // session id. The backend now scopes chat history by user_id too (so this
+  // alone was never a data leak), but a fresh account should still start a
+  // genuinely new conversation, not silently continue someone else's.
+  sessionStorage.removeItem('ikyam_ai_session')
 }
 
 export function currentCompanyId() {

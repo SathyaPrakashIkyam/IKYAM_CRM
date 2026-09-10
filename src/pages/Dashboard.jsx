@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import AppShell from '../components/AppShell'
 import { dashboardApi } from '../api/endpoints'
-import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
 import '../styles/Dashboard.css'
+import { useAuth } from '../context/AuthContext'
 
 const MIX_COLORS = ['var(--green)', 'var(--amber)', 'var(--orange)', 'var(--primary)', 'var(--mut)', 'var(--faint)']
 
@@ -77,7 +77,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null)
   const [period, setPeriod] = useState('this_quarter')
   const [question, setQuestion] = useState('')
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
 
   useEffect(() => {
     if (!companyId) return

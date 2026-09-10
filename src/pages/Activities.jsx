@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { activitiesApi, leadsApi } from '../api/endpoints'
-import { currentCompanyId } from '../api/client'
 import { openActivityInProvider, detectProviderFromEmail } from '../utils/activityLinks'
 import { useAuth } from '../context/AuthContext'
 import '../styles/ikyam-mock.css'
@@ -30,9 +29,9 @@ export default function Activities() {
   const [showNew, setShowNew] = useState(false)
   const [form, setForm] = useState({ activity_type: 'call', subject: '', due_at: '', lead_id: '' })
   const [attendeeEmail, setAttendeeEmail] = useState('')
-  const { user } = useAuth()
+  const [newAttachments, setNewAttachments] = useState([])
+  const { user, companyId } = useAuth()
   const provider = detectProviderFromEmail(user?.email) // 'google' | 'outlook' — based on the logged-in user's own email
-  const companyId = currentCompanyId()
   const needsProvider = form.activity_type === 'meeting' || form.activity_type === 'email'
 
   function load() {
@@ -68,6 +67,7 @@ export default function Activities() {
             related_record_id: form.lead_id,
           }
         : {}),
+      attachments: newAttachments,
     }
     const activity = await activitiesApi.create(companyId, payload)
 
@@ -80,8 +80,20 @@ export default function Activities() {
 
     setForm({ activity_type: 'call', subject: '', due_at: '', lead_id: '' })
     setAttendeeEmail('')
+    setNewAttachments([])
     setShowNew(false)
     load()
+  }
+
+  function handleNewAttachmentChange(e) {
+    const selected = Array.from(e.target.files || [])
+    if (selected.length === 0) return
+    setNewAttachments((prev) => [...prev, ...selected])
+    e.target.value = ''
+  }
+
+  function removeNewAttachment(indexToRemove) {
+    setNewAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove))
   }
 
   const [completeTarget, setCompleteTarget] = useState(null)
@@ -316,7 +328,13 @@ export default function Activities() {
         </div>
 
         {showNew && (
-          <div className="lead-modal-overlay" onClick={() => setShowNew(false)}>
+          <div
+            className="lead-modal-overlay"
+            onClick={() => {
+              setShowNew(false)
+              setNewAttachments([])
+            }}
+          >
             <div className="lead-modal-card activity-modal-dialog" onClick={(e) => e.stopPropagation()}>
               <div className="lead-modal-header">
                 <div className="lead-modal-title-row">
@@ -326,7 +344,14 @@ export default function Activities() {
                     <span className="tiny mut">Schedule a call, meeting, task, or follow-up</span>
                   </div>
                 </div>
-                <button type="button" className="lead-modal-close" onClick={() => setShowNew(false)}>✕</button>
+                <button
+                  type="button"
+                  className="lead-modal-close"
+                  onClick={() => {
+                    setShowNew(false)
+                    setNewAttachments([])
+                  }}
+                >✕</button>
               </div>
               <div className="title-bar" style={{ margin: '0 0 20px 0', width: 44, height: 3 }} />
 
@@ -399,6 +424,75 @@ export default function Activities() {
                       onChange={(e) => setForm({ ...form, subject: e.target.value })}
                     />
                   </div>
+
+                  <div className="lead-modal-full-width">
+                    <div className="rowx sp" style={{ marginBottom: 6 }}>
+                      <label className="lead-modal-label" style={{ margin: 0 }}>Attachments</label>
+                      <span className="tiny mut">Optional · Multiple files supported</span>
+                    </div>
+                    <label
+                      style={{
+                        border: '1.5px dashed var(--line, rgba(0, 201, 167, 0.35))',
+                        borderRadius: 16,
+                        padding: '14px 18px',
+                        background: 'var(--surface2, rgba(240, 246, 250, 0.5))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 10,
+                        cursor: 'pointer',
+                      }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        const dropped = Array.from(e.dataTransfer.files || [])
+                        if (dropped.length) {
+                          setNewAttachments((prev) => [...prev, ...dropped])
+                        }
+                      }}
+                    >
+                      <input type="file" multiple style={{ display: 'none' }} onChange={handleNewAttachmentChange} />
+                      <span style={{ fontSize: 18 }}>📎</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <span style={{ font: '600 12.5px var(--b)', color: 'var(--primary, #00C9A7)' }}>Choose files</span>
+                        <span className="tiny mut" style={{ marginLeft: 6 }}>or drag &amp; drop here</span>
+                      </div>
+                    </label>
+
+                    {newAttachments.length > 0 && (
+                      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 130, overflowY: 'auto', paddingRight: 4 }}>
+                        {newAttachments.map((file, idx) => (
+                          <div
+                            key={`${file.name}-${idx}`}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              background: 'var(--surface, #fff)',
+                              border: '1px solid var(--line, rgba(0, 201, 167, 0.2))',
+                              borderRadius: 10,
+                              padding: '6px 12px',
+                              fontSize: 12,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <span>📄</span>
+                              <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{file.name}</span>
+                              <span className="tiny mut">({formatFileSize(file.size)})</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeNewAttachment(idx)}
+                              style={{ border: 'none', background: 'transparent', color: 'var(--mut)', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}
+                              title="Remove file"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {needsProvider && (
@@ -410,7 +504,14 @@ export default function Activities() {
                 )}
 
                 <div className="lead-modal-actions">
-                  <button type="button" className="btn ghost lead-modal-cancel-btn" onClick={() => setShowNew(false)}>
+                  <button
+                    type="button"
+                    className="btn ghost lead-modal-cancel-btn"
+                    onClick={() => {
+                      setShowNew(false)
+                      setNewAttachments([])
+                    }}
+                  >
                     Cancel
                   </button>
                   <button type="submit" className="btn pri lead-modal-submit-btn">

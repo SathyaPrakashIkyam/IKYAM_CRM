@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import AppShell from '../components/AppShell'
 import { reportsApi } from '../api/endpoints'
-import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
 import '../styles/Reports.css'
+import { useAuth } from '../context/AuthContext'
 
 const REPORTS = [
   { key: 'pipeline_by_stage', label: 'Pipeline by stage', fetch: reportsApiCall('pipelineByStage') },
@@ -47,7 +47,7 @@ export default function Reports() {
   const [owner, setOwner] = useState('team')
   const [report, setReport] = useState(null)
   const [saved, setSaved] = useState([])
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
 
   useEffect(() => {
     if (!companyId) return

@@ -23,6 +23,12 @@ export default function Record() {
   const [activities, setActivities] = useState([])
   const [activeType, setActiveType] = useState('call')
   const [subject, setSubject] = useState('')
+  const [newAttachments, setNewAttachments] = useState([])
+  const [completeTarget, setCompleteTarget] = useState(null)
+  const [completeSummary, setCompleteSummary] = useState('')
+  const [completeAttachments, setCompleteAttachments] = useState([])
+  const [completeError, setCompleteError] = useState('')
+  const [submittingComplete, setSubmittingComplete] = useState(false)
   const [stages, setStages] = useState([])
   const [relatedQuotes, setRelatedQuotes] = useState([])
   const [contactsCount, setContactsCount] = useState(null)
@@ -31,6 +37,9 @@ export default function Record() {
   const [showLostReason, setShowLostReason] = useState(false)
   const [lostReasonText, setLostReasonText] = useState('')
   const [lostReasonError, setLostReasonError] = useState('')
+  // Surfaces a rejected "Mark won" (e.g. "needs at least one quote") — this
+  // used to just fail silently since closeDeal had no error handling.
+  const [closeError, setCloseError] = useState('')
   const navigate = useNavigate()
   const activityInputRef = useRef(null)
 
@@ -87,6 +96,7 @@ export default function Record() {
       // created directly (no source lead) still gets lead_id: undefined,
       // same as before.
       lead_id: opp.source_lead_id || undefined,
+      attachments: newAttachments,
     })
 
     // Meeting/email activities redirect straight into the logged-in user's
@@ -97,17 +107,81 @@ export default function Record() {
     }
 
     setSubject('')
+    setNewAttachments([])
     loadActivities()
   }
 
-  async function completeActivity(activityId) {
-    const formData = new FormData()
-    formData.append('summary', 'Completed')
-    await activitiesApi.complete(activityId, formData)
-    loadActivities()
+  function handleNewAttachmentChange(e) {
+    const selected = Array.from(e.target.files || [])
+    if (selected.length === 0) return
+    setNewAttachments((prev) => [...prev, ...selected])
+    e.target.value = ''
+  }
+
+  function removeNewAttachment(indexToRemove) {
+    setNewAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove))
+  }
+
+  // Clicking an open activity's dot used to instantly complete it with a
+  // hardcoded "Completed" placeholder summary and no way to attach
+  // anything — inconsistent with the real Complete flow on the Activities
+  // page, which requires a real summary and supports attachments. This
+  // opens the same kind of modal here instead of silently force-completing.
+  function openCompleteModal(activity) {
+    setCompleteTarget(activity)
+    setCompleteSummary('')
+    setCompleteAttachments([])
+    setCompleteError('')
+  }
+
+  function closeCompleteModal() {
+    if (submittingComplete) return
+    setCompleteTarget(null)
+    setCompleteSummary('')
+    setCompleteAttachments([])
+    setCompleteError('')
+  }
+
+  function handleCompleteAttachmentChange(e) {
+    const selected = Array.from(e.target.files || [])
+    if (selected.length === 0) return
+    setCompleteAttachments((prev) => [...prev, ...selected])
+    e.target.value = ''
+  }
+
+  function removeCompleteAttachment(indexToRemove) {
+    setCompleteAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove))
+  }
+
+  async function handleConfirmComplete(e) {
+    if (e) e.preventDefault()
+    if (!completeTarget) return
+    const trimmed = completeSummary.trim()
+    if (!trimmed) {
+      setCompleteError('Summary is mandatory before marking this activity as completed.')
+      return
+    }
+    setSubmittingComplete(true)
+    setCompleteError('')
+    try {
+      const formData = new FormData()
+      formData.append('summary', trimmed)
+      for (const file of completeAttachments) {
+        formData.append('attachments', file)
+      }
+      await activitiesApi.complete(completeTarget.id, formData)
+      closeCompleteModal()
+      loadActivities()
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.detail || 'Failed to complete activity. Please try again.'
+      setCompleteError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    } finally {
+      setSubmittingComplete(false)
+    }
   }
 
   async function closeDeal(outcome) {
+    setCloseError('')
     if (outcome === 'lost') {
       // Marking a deal lost always stops to collect a reason first — the
       // API rejects a lost close without one anyway, so this just surfaces
@@ -117,8 +191,14 @@ export default function Record() {
       setShowLostReason(true)
       return
     }
-    const updated = await opportunitiesApi.close(id, { outcome })
-    setOpp(updated)
+    try {
+      const updated = await opportunitiesApi.close(id, { outcome })
+      setOpp(updated)
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : (detail?.[0]?.msg || err?.message || 'Could not close this deal.')
+      setCloseError(msg)
+    }
   }
 
   async function confirmLostReason() {
@@ -167,7 +247,13 @@ export default function Record() {
               </div>
               <div className="rowx" style={{ flexWrap: 'wrap' }}>
                 <button className="btn ghost" style={{ fontWeight: 700 }} onClick={focusActivityForm}>Log activity</button>
-                <button className="btn ghost" style={{ fontWeight: 700 }} onClick={() => navigate('/newQuotes')}>New quote</button>
+                <button
+                  className="btn ghost"
+                  style={{ fontWeight: 700 }}
+                  onClick={() => navigate('/newQuotes', { state: { accountId: opp.account_id } })}
+                >
+                  New quote
+                </button>
                 {opp.status === 'open' && (
                   <>
                     <button className="btn pri" onClick={() => closeDeal('won')}>Mark won</button>
@@ -176,6 +262,27 @@ export default function Record() {
                 )}
               </div>
             </div>
+
+            {closeError && (
+              <div
+                className="tiny"
+                style={{
+                  marginTop: 10,
+                  color: 'var(--danger, #d64545)',
+                  background: 'rgba(214, 69, 69, 0.08)',
+                  border: '1px solid rgba(214, 69, 69, 0.25)',
+                  borderRadius: 10,
+                  padding: '9px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}
+              >
+                <span>⚠ {closeError}</span>
+                <span style={{ cursor: 'pointer' }} onClick={() => setCloseError('')}>✕</span>
+              </div>
+            )}
 
             {stages.length > 0 && currentStageIndex >= 0 && (
               <>
@@ -224,6 +331,33 @@ export default function Record() {
                   placeholder="What happened?"
                   className="record-activity-input"
                 />
+                <label
+                  className="rowx"
+                  style={{
+                    marginTop: 8,
+                    gap: 6,
+                    cursor: 'pointer',
+                    border: '1px dashed var(--line, rgba(0, 201, 167, 0.35))',
+                    borderRadius: 10,
+                    padding: '6px 10px',
+                  }}
+                >
+                  <input type="file" multiple style={{ display: 'none' }} onChange={handleNewAttachmentChange} />
+                  <span style={{ fontSize: 13 }}>📎</span>
+                  <span className="tiny" style={{ color: 'var(--primary, #00C9A7)', fontWeight: 600 }}>
+                    {newAttachments.length > 0 ? `${newAttachments.length} file(s) attached` : 'Attach files (optional)'}
+                  </span>
+                </label>
+                {newAttachments.length > 0 && (
+                  <div className="rowx" style={{ marginTop: 6, gap: 6, flexWrap: 'wrap' }}>
+                    {newAttachments.map((file, idx) => (
+                      <span key={`${file.name}-${idx}`} className="chip" style={{ fontSize: 11, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        📄 {file.name}
+                        <span style={{ cursor: 'pointer', marginLeft: 2 }} onClick={() => removeNewAttachment(idx)}>✕</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="rowx sp" style={{ marginTop: 8 }}>
                   <span className="tiny">Logging as <b>{ACTIVITY_TYPES.find((t) => t.type === activeType)?.label}</b></span>
                   <button className="btn pri" style={{ padding: '5px 11px' }} onClick={addActivity}>＋ Add activity</button>
@@ -233,12 +367,13 @@ export default function Record() {
               <div className="tl">
                 {activities.map((a) => (
                   <div className="tl-item" key={a.id}>
-                    <div className={`dot ${a.status === 'completed' ? 'g' : ''}`} onClick={() => a.status === 'open' && completeActivity(a.id)} style={{ cursor: a.status === 'open' ? 'pointer' : 'default' }}>
+                    <div className={`dot ${a.status === 'completed' ? 'g' : ''}`} onClick={() => a.status === 'open' && openCompleteModal(a)} style={{ cursor: a.status === 'open' ? 'pointer' : 'default' }}>
                       {iconFor(a.activity_type)}
                     </div>
                     <div>
                       <b style={{ fontSize: 12.5, textDecoration: a.status === 'completed' ? 'line-through' : 'none' }}>{a.subject}</b>
                       <div className="tiny">{a.activity_type} · {a.status}</div>
+                      {a.summary && <div className="tiny" style={{ marginTop: 2, fontStyle: 'italic' }}>{a.summary}</div>}
                     </div>
                   </div>
                 ))}
@@ -286,17 +421,27 @@ export default function Record() {
                 <div
                   className="rec-related-row"
                   onClick={() =>
-                    relatedQuotes[0]
-                      ? navigate(`/quotesDetails/${relatedQuotes[0].id}`, {
-                          state: { id: relatedQuotes[0].id, quote: relatedQuotes[0] },
-                        })
-                      : navigate('/quotesList')
+                    relatedQuotes.length > 0
+                      ? // Same pattern as the Contacts row below: go to the
+                        // full list, pre-filtered to this account — not
+                        // straight into a single quote's details, so more
+                        // than one quote for this deal is still browsable.
+                        navigate('/quotesList', { state: { accountId: opp.account_id } })
+                      : // No quotes for this deal yet — the plain quotes list
+                        // was unfiltered and showed unrelated quotes from
+                        // other accounts, which looked like a broken link.
+                        // Go straight to creating one for this account instead.
+                        navigate('/newQuotes', { state: { accountId: opp.account_id } })
                   }
                 >
                   <span className="tiny">Quotes</span>
-                  <b className="tiny">{relatedQuotes.length}</b>
+                  {relatedQuotes.length > 0 ? (
+                    <b className="tiny">{relatedQuotes.length}</b>
+                  ) : (
+                    <span className="tiny" style={{ color: 'var(--primary, #00C9A7)', fontWeight: 600 }}>+ New quote</span>
+                  )}
                 </div>
-                <div className="rec-related-row" onClick={() => navigate(`/accounts/${opp.account_id}`)}>
+                <div className="rec-related-row" onClick={() => navigate('/contacts', { state: { accountFilter: opp.account_id } })}>
                   <span className="tiny">Contacts</span>
                   <b className="tiny">{contactsCount ?? '—'}</b>
                 </div>
@@ -343,6 +488,87 @@ export default function Record() {
                 Confirm Lost ✓
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {completeTarget && (
+        <div className="lead-modal-overlay" onClick={closeCompleteModal}>
+          <div className="lead-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="lead-modal-header">
+              <div className="lead-modal-title-row">
+                <div className="lead-modal-icon-badge" style={{ color: '#00C9A7', background: 'rgba(0, 201, 167, 0.12)' }}>✓</div>
+                <div>
+                  <h3>Complete Activity</h3>
+                  <span className="tiny mut">{completeTarget.subject}</span>
+                </div>
+              </div>
+              <button type="button" className="lead-modal-close" onClick={closeCompleteModal} disabled={submittingComplete}>✕</button>
+            </div>
+            <div className="title-bar" style={{ margin: '0 0 16px 0', width: 44, height: 3 }} />
+
+            <form onSubmit={handleConfirmComplete}>
+              <div style={{ marginBottom: 16 }}>
+                <div className="rowx sp" style={{ marginBottom: 6 }}>
+                  <label className="lead-modal-label" style={{ margin: 0 }}>Summary *</label>
+                  <span className="tiny" style={{ color: 'var(--danger, #d64545)', fontWeight: 600 }}>Mandatory</span>
+                </div>
+                <textarea
+                  autoFocus
+                  required
+                  rows={4}
+                  placeholder="What happened, outcome, next steps..."
+                  className="lead-modal-input"
+                  style={{ height: 'auto', minHeight: 90, padding: '12px 16px', borderRadius: 16, resize: 'vertical', fontFamily: 'inherit' }}
+                  value={completeSummary}
+                  onChange={(e) => { setCompleteSummary(e.target.value); if (completeError) setCompleteError('') }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label className="lead-modal-label">Attachments <span className="tiny mut">(optional)</span></label>
+                <label
+                  style={{
+                    border: '1.5px dashed var(--line, rgba(0, 201, 167, 0.35))',
+                    borderRadius: 16,
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    cursor: 'pointer',
+                    marginTop: 4,
+                  }}
+                >
+                  <input type="file" multiple style={{ display: 'none' }} onChange={handleCompleteAttachmentChange} />
+                  <span>📎</span>
+                  <span className="tiny" style={{ color: 'var(--primary, #00C9A7)', fontWeight: 600 }}>Choose files</span>
+                </label>
+                {completeAttachments.length > 0 && (
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {completeAttachments.map((file, idx) => (
+                      <div key={`${file.name}-${idx}`} className="rowx sp" style={{ background: 'var(--surface2)', border: '1px solid var(--line)', borderRadius: 10, padding: '6px 12px', fontSize: 12 }}>
+                        <span>📄 {file.name}</span>
+                        <span style={{ cursor: 'pointer' }} onClick={() => removeCompleteAttachment(idx)}>✕</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {completeError && (
+                <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginBottom: 12, background: 'rgba(214, 69, 69, 0.08)', padding: '8px 12px', borderRadius: 10 }}>
+                  ⚠ {completeError}
+                </div>
+              )}
+
+              <div className="lead-modal-actions">
+                <button type="button" className="btn ghost lead-modal-cancel-btn" onClick={closeCompleteModal} disabled={submittingComplete}>Cancel</button>
+                <button type="submit" className="btn pri lead-modal-submit-btn" disabled={submittingComplete || !completeSummary.trim()}>
+                  {submittingComplete ? 'Saving…' : 'Confirm Completed ✓'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

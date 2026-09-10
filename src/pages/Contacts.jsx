@@ -3,18 +3,22 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { accountsApi, contactsApi, leadsApi } from '../api/endpoints'
-import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
 import '../styles/Contacts.css'
+import { useAuth } from '../context/AuthContext'
 
 export default function Contacts() {
+  const location = useLocation()
   const [contacts, setContacts] = useState([])
   const [accounts, setAccounts] = useState([])
   const [leads, setLeads] = useState([])
   const [selected, setSelected] = useState(null)
   const [showNew, setShowNew] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [accountFilter, setAccountFilter] = useState('all')
+  // Arriving here via a deal's "Related > Contacts" link passes the
+  // account to filter by — without this it always landed on "All accounts"
+  // and made the user re-find + reselect the account by hand.
+  const [accountFilter, setAccountFilter] = useState(location.state?.accountFilter || 'all')
   const [formError, setFormError] = useState('')
 
   const emptyContact = {
@@ -29,8 +33,7 @@ export default function Contacts() {
   const [newContact, setNewContact] = useState(emptyContact)
 
   const navigate = useNavigate()
-  const location = useLocation()
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
 
   function load() {
     if (!companyId) return
@@ -337,34 +340,30 @@ export default function Contacts() {
                   </div>
 
                   <div className="contact-modal-full-width">
-                    <label className="contact-modal-label">Account / Company</label>
+                    <label className="contact-modal-label">Lead - Company</label>
                     <CustomSelect
                       options={[
-                        { value: '', label: 'Select company account...' },
-                        ...accounts.map((a) => ({ value: a.id, label: a.name })),
-                      ]}
-                      value={newContact.account_id}
-                      onChange={(val) => setNewContact({ ...newContact, account_id: val })}
-                      className="contact-modal-custom-select"
-                      placeholder="Select company account..."
-                    />
-                  </div>
-
-                  <div className="contact-modal-full-width">
-                    <label className="contact-modal-label">Lead</label>
-                    <CustomSelect
-                      options={[
-                        { value: '', label: 'Select a lead (optional)...' },
-                        ...leads.map((l) => ({ value: l.id, label: `${l.name} · ${l.lead_no}` })),
+                        { value: '', label: 'Select a lead\'s company...' },
+                        ...leads
+                          .filter((l) => l.company_name)
+                          .map((l) => ({ value: l.id, label: `${l.company_name} (Lead ${l.lead_no})` })),
                       ]}
                       value={newContact.lead_id}
-                      onChange={(val) => setNewContact({ ...newContact, lead_id: val })}
+                      onChange={(val) => {
+                        // Driven by the Lead's own company name now, not a
+                        // separate Account picker — the matching Account (if
+                        // this lead has already converted) is found by
+                        // company name and attached automatically, instead
+                        // of making the user pick both by hand.
+                        const lead = leads.find((l) => l.id === val)
+                        const matchedAccount = lead
+                          ? accounts.find((a) => (a.name || '').trim().toLowerCase() === (lead.company_name || '').trim().toLowerCase())
+                          : null
+                        setNewContact({ ...newContact, lead_id: val, account_id: matchedAccount?.id || '' })
+                      }}
                       className="contact-modal-custom-select"
-                      placeholder="Select a lead..."
+                      placeholder="Select a lead's company..."
                     />
-                    <span className="tiny mut" style={{ display: 'block', marginTop: 4 }}>
-                      Attach this contact to a Lead — you can add multiple contacts under the same Lead.
-                    </span>
                   </div>
 
                   <div>

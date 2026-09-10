@@ -3,10 +3,10 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import AppShell from '../../components/AppShell'
 import CustomSelect from '../../components/CustomSelect'
 import { accountsApi, quotesApi, productsApi, priceListsApi, productGroupsApi } from '../../api/endpoints'
-import { currentCompanyId } from '../../api/client'
 import '../../styles/ikyam-mock.css'
 import '../../styles/Quotes.css'
 import '../../styles/Products.css'
+import { useAuth } from '../../context/AuthContext'
 
 const EMPTY_LINE = {
   description: '',
@@ -31,7 +31,7 @@ export default function QuotesDetails() {
   const navigate = useNavigate()
   const params = useParams()
   const location = useLocation()
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
 
   const quoteId = params.id || location.state?.id || location.state?.openId
 

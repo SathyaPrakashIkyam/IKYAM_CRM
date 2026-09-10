@@ -169,6 +169,30 @@
   50% { opacity: 0; }
 }
 
+.ai-chat-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.ai-chat-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mut);
+  opacity: 0.4;
+  animation: aiChatTypingBounce 1.1s ease-in-out infinite;
+}
+
+.ai-chat-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.ai-chat-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes aiChatTypingBounce {
+  0%, 60%, 100% { opacity: 0.4; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
 .ai-chat-inputrow {
   display: flex;
   gap: 8px;

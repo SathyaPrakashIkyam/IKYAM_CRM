@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { opportunitiesApi } from '../api/endpoints'
-import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
 import '../styles/Pipeline.css'
+import { useAuth } from '../context/AuthContext'
 
 const AV_CLASSES = ['a', 'b', 'c']
 function avatarFor(name) {
@@ -53,8 +53,12 @@ export default function Pipeline() {
   const [selectedReason, setSelectedReason] = useState('')
   const [lostReasonText, setLostReasonText] = useState('')
   const [lostReasonError, setLostReasonError] = useState('')
+  // Surfaces a rejected move (e.g. "needs at least one quote before it can
+  // be marked Won") — moveCard used to just let the request fail silently,
+  // so dragging a card onto Won with no quote looked like nothing happened.
+  const [moveError, setMoveError] = useState('')
   const navigate = useNavigate()
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
 
   function load() {
     if (!companyId) return
@@ -112,8 +116,16 @@ export default function Pipeline() {
   }
 
   async function moveCard(cardId, toStageId, lostReason) {
-    await opportunitiesApi.moveStage(cardId, toStageId, lostReason)
-    load()
+    setMoveError('')
+    try {
+      await opportunitiesApi.moveStage(cardId, toStageId, lostReason)
+      load()
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : (detail?.[0]?.msg || err?.message || 'Could not move this deal.')
+      setMoveError(msg)
+      setTimeout(() => setMoveError(''), 6000)
+    }
   }
 
   // Any path that can land a deal on a "lost" stage — drag-and-drop or the
@@ -254,6 +266,27 @@ export default function Pipeline() {
             <div className="mono pipeline-strip-num">₹{Math.round(forecast.weighted).toLocaleString('en-IN')}</div>
           </div>
         </div>
+
+        {moveError && (
+          <div
+            className="tiny"
+            style={{
+              marginTop: 14,
+              color: 'var(--danger, #d64545)',
+              background: 'rgba(214, 69, 69, 0.08)',
+              border: '1px solid rgba(214, 69, 69, 0.25)',
+              borderRadius: 10,
+              padding: '9px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <span>⚠ {moveError}</span>
+            <span style={{ cursor: 'pointer' }} onClick={() => setMoveError('')}>✕</span>
+          </div>
+        )}
 
         {/* Board View */}
         {view === 'board' && (

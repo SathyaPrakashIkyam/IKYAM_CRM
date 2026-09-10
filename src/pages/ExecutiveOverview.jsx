@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { dashboardApi, opportunitiesApi } from '../api/endpoints'
-import { currentCompanyId } from '../api/client'
 import '../styles/ikyam-mock.css'
 import '../styles/ExecutiveOverview.css'
+import { useAuth } from '../context/AuthContext'
 
 const STRIP_COLORS = ['var(--line2)', 'var(--amber)', 'var(--orange)', 'var(--green)', 'var(--primary)']
 
@@ -12,7 +12,7 @@ export default function ExecutiveOverview() {
   const [summary, setSummary] = useState(null)
   const [columns, setColumns] = useState([])
   const navigate = useNavigate()
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
 
   useEffect(() => {
     if (!companyId) return

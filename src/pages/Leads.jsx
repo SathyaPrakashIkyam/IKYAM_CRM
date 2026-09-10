@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { leadsApi } from '../api/endpoints'
-import { currentCompanyId } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import '../styles/ikyam-mock.css'
 import '../styles/Leads.css'
 
@@ -124,7 +124,7 @@ export default function Leads() {
   const [formError, setFormError] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
 
   function toCamelCase(value) {
     return value
@@ -214,7 +214,6 @@ export default function Leads() {
   async function submitLead(e) {
     e.preventDefault()
     setFormError('')
-
     const firstName = newLead.first_name.trim()
     const lastName = newLead.last_name.trim()
     const email = newLead.email.trim()

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../../components/AppShell'
 import CustomSelect from '../../components/CustomSelect'
 import { quotesApi } from '../../api/endpoints'
-import { currentCompanyId } from '../../api/client'
 import '../../styles/ikyam-mock.css'
 import '../../styles/Quotes.css'
 import '../../styles/Products.css'
+import { useAuth } from '../../context/AuthContext'
 
 function formatINR(val) {
   return Number(val || 0).toLocaleString('en-IN', {
@@ -17,6 +17,7 @@ function formatINR(val) {
 
 export default function QuotesList() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [quotes, setQuotes] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -24,8 +25,13 @@ export default function QuotesList() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
+  // Arriving here via a deal's "Related > Quotes" link (when it has more
+  // than one quote) passes the account to filter by — without this it
+  // always landed on every quote across every account, which looked
+  // identical to the unfiltered "no quotes yet" redirect it used to be.
+  const [accountFilter, setAccountFilter] = useState(location.state?.accountId || 'all')
 
-  const companyId = currentCompanyId()
+  const { companyId } = useAuth()
 
   function loadQuotes() {
     if (!companyId) return
@@ -50,6 +56,9 @@ export default function QuotesList() {
       // Quote type filter
       if (typeFilter !== 'all' && q.quote_type !== typeFilter) return false
 
+      // Account filter (arrived here from a specific deal/account)
+      if (accountFilter !== 'all' && q.account_id !== accountFilter) return false
+
       // Search query
       if (!searchQuery.trim()) return true
       const s = searchQuery.toLowerCase().trim()
@@ -67,7 +76,20 @@ export default function QuotesList() {
         lineMatch
       )
     })
-  }, [quotes, statusFilter, typeFilter, searchQuery])
+  }, [quotes, statusFilter, typeFilter, accountFilter, searchQuery])
+
+  // Built from the quotes actually loaded (each already carries
+  // account_id/account_name) — no separate accounts fetch needed just for
+  // this filter dropdown.
+  const accountOptions = useMemo(() => {
+    const seen = new Map()
+    for (const q of quotes) {
+      if (q.account_id && !seen.has(q.account_id)) {
+        seen.set(q.account_id, q.account_name || '—')
+      }
+    }
+    return [{ value: 'all', label: 'All Accounts' }, ...Array.from(seen, ([value, label]) => ({ value, label }))]
+  }, [quotes])
 
   // Metric strip summary
   const metrics = useMemo(() => {
@@ -140,6 +162,19 @@ export default function QuotesList() {
                 style={{ minWidth: 140 }}
               />
             </div>
+
+            {/* Account Filter Dropdown */}
+            {accountOptions.length > 1 && (
+              <div className="rowx" style={{ gap: 6, alignItems: 'center' }}>
+                <span className="tiny mut font-semibold">Account:</span>
+                <CustomSelect
+                  options={accountOptions}
+                  value={accountFilter}
+                  onChange={setAccountFilter}
+                  style={{ minWidth: 160 }}
+                />
+              </div>
+            )}
           </div>
 
           <button

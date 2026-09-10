@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../../components/AppShell'
 import CustomSelect from '../../components/CustomSelect'
 import { accountsApi, quotesApi, productsApi, priceListsApi, productGroupsApi } from '../../api/endpoints'
-import { currentCompanyId } from '../../api/client'
 import '../../styles/ikyam-mock.css'
 import '../../styles/Quotes.css'
 import '../../styles/Products.css'
+import { useAuth } from '../../context/AuthContext'
 
 const EMPTY_LINE = {
   description: '',
@@ -30,7 +30,11 @@ function formatINR(val) {
 
 export default function NewQuotes() {
   const navigate = useNavigate()
-  const companyId = currentCompanyId()
+  const location = useLocation()
+  const { companyId } = useAuth()
+  // Coming from a deal's "New quote" button — that account should already
+  // be selected here rather than making the user pick it again by hand.
+  const prefilledAccountId = location.state?.accountId || ''
 
   // Form State
   const [form, setForm] = useState(EMPTY_FORM)
@@ -81,17 +85,23 @@ export default function NewQuotes() {
 
     accountsApi
       .list(companyId)
-      .then((data) => setAccounts(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : []
+        setAccounts(list)
+        if (prefilledAccountId && list.some((a) => a.id === prefilledAccountId)) {
+          setForm((f) => ({ ...f, account_id: prefilledAccountId }))
+        }
+      })
       .catch((e) => console.error('Failed to load accounts:', e))
 
     priceListsApi
       .list(companyId)
       .then((pls) => {
-        const arr = Array.isArray(pls) ? pls : []
-        setPriceLists(arr)
-        if (arr.length > 0) {
-          setSelectedPriceListId(arr[0].id)
-        }
+        // Only the account should ever come pre-selected (e.g. arriving
+        // here from a deal's "New quote" button) — the price list is left
+        // for the user to pick deliberately, not silently defaulted to
+        // whichever one happens to be first in the list.
+        setPriceLists(Array.isArray(pls) ? pls : [])
       })
       .catch((e) => console.error('Failed to load price lists:', e))
 
