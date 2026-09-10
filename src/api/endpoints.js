@@ -147,7 +147,12 @@ export const activitiesApi = {
     api.post('/activities', body, { params: { company_id: companyId } }).then((r) => r.data),
   forRecord: (objectType, recordId) =>
     api.get(`/activities/for/${objectType}/${recordId}`).then((r) => r.data),
-  complete: (id, outcome) => api.post(`/activities/${id}/complete`, { outcome }).then((r) => r.data),
+  complete: (id, formData) =>
+    api
+      .post(`/activities/${id}/complete`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data),
   reopen: (id) => api.post(`/activities/${id}/reopen`).then((r) => r.data),
 }
 

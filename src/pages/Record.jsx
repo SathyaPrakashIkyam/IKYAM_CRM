@@ -92,7 +92,9 @@ export default function Record() {
   }
 
   async function completeActivity(activityId) {
-    await activitiesApi.complete(activityId)
+    const formData = new FormData()
+    formData.append('summary', 'Completed')
+    await activitiesApi.complete(activityId, formData)
     loadActivities()
   }
 

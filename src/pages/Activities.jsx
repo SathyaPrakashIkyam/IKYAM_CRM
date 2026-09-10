@@ -84,9 +84,71 @@ export default function Activities() {
     load()
   }
 
-  async function complete(id) {
-    await activitiesApi.complete(id)
-    load()
+  const [completeTarget, setCompleteTarget] = useState(null)
+  const [completeSummary, setCompleteSummary] = useState('')
+  const [completeAttachments, setCompleteAttachments] = useState([])
+  const [completeError, setCompleteError] = useState('')
+  const [submittingComplete, setSubmittingComplete] = useState(false)
+
+  function openCompleteModal(activity) {
+    setCompleteTarget(activity)
+    setCompleteSummary('')
+    setCompleteAttachments([])
+    setCompleteError('')
+  }
+
+  function closeCompleteModal() {
+    if (submittingComplete) return
+    setCompleteTarget(null)
+    setCompleteSummary('')
+    setCompleteAttachments([])
+    setCompleteError('')
+  }
+
+  function handleFileChange(e) {
+    const selected = Array.from(e.target.files || [])
+    if (selected.length === 0) return
+    setCompleteAttachments((prev) => [...prev, ...selected])
+    e.target.value = ''
+  }
+
+  function removeAttachment(indexToRemove) {
+    setCompleteAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove))
+  }
+
+  async function handleConfirmComplete(e) {
+    if (e) e.preventDefault()
+    if (!completeTarget) return
+
+    const trimmed = completeSummary.trim()
+    if (!trimmed) {
+      setCompleteError('Summary is mandatory before marking this activity as completed.')
+      return
+    }
+
+    setSubmittingComplete(true)
+    setCompleteError('')
+
+    try {
+      const formData = new FormData()
+      formData.append('summary', trimmed)
+      for (const file of completeAttachments) {
+        formData.append('attachments', file)
+      }
+
+      await activitiesApi.complete(completeTarget.id, formData)
+      closeCompleteModal()
+      load()
+    } catch (err) {
+      console.error('Failed to complete activity:', err)
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.detail ||
+        'Failed to complete activity. Please try again.'
+      setCompleteError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    } finally {
+      setSubmittingComplete(false)
+    }
   }
 
   const overdue = activities.filter((a) => a.status === 'open' && a.due_at && new Date(a.due_at) < new Date())
@@ -147,7 +209,7 @@ export default function Activities() {
               badgeText={`${overdue.length} requiring immediate action`}
               items={overdue}
               leads={leads}
-              onComplete={complete}
+              onComplete={openCompleteModal}
               tone="risk"
             />
             <ActivitySection
@@ -155,14 +217,14 @@ export default function Activities() {
               badgeText={`${open.length} pending`}
               items={open}
               leads={leads}
-              onComplete={complete}
+              onComplete={openCompleteModal}
             />
             <ActivitySection
               title="Completed"
               badgeText={`${done.length} finished`}
               items={done}
               leads={leads}
-              onComplete={complete}
+              onComplete={openCompleteModal}
               isDone
             />
             {activities.length === 0 && (
@@ -281,6 +343,276 @@ export default function Activities() {
             </div>
           </div>
         )}
+
+        {/* Modal: Complete Activity (Mandatory Summary + Multiple Attachments) */}
+        {completeTarget && (
+          <div className="lead-modal-overlay" onClick={closeCompleteModal}>
+            <div
+              className="lead-modal-card activity-modal-dialog"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: 520, borderRadius: 24 }}
+            >
+              <div className="lead-modal-header">
+                <div className="lead-modal-title-row">
+                  <div
+                    className="lead-modal-icon-badge"
+                    style={{
+                      color: '#00C9A7',
+                      background: 'rgba(0, 201, 167, 0.12)',
+                      fontSize: 18,
+                    }}
+                  >
+                    ✓
+                  </div>
+                  <div>
+                    <h3>Complete Activity</h3>
+                    <span className="tiny mut">Record completion summary and attach files</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="lead-modal-close"
+                  onClick={closeCompleteModal}
+                  disabled={submittingComplete}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="title-bar" style={{ margin: '0 0 16px 0', width: 44, height: 3 }} />
+
+              {/* Target Activity Summary Preview */}
+              <div
+                style={{
+                  background: 'var(--surface2, rgba(240, 246, 250, 0.7))',
+                  border: '1px solid var(--line, rgba(0, 201, 167, 0.2))',
+                  borderRadius: 14,
+                  padding: '10px 14px',
+                  marginBottom: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 18,
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    background: 'rgba(0, 201, 167, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {typeIcon(completeTarget.activity_type)}
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 13.5,
+                      color: 'var(--ink)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {completeTarget.subject}
+                  </div>
+                  <div className="tiny mut" style={{ textTransform: 'capitalize' }}>
+                    {completeTarget.activity_type}
+                    {completeTarget.due_at && (
+                      <span> · Due {new Date(completeTarget.due_at).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleConfirmComplete}>
+                {/* Summary Field */}
+                <div style={{ marginBottom: 16 }}>
+                  <div className="rowx sp" style={{ marginBottom: 6 }}>
+                    <label className="lead-modal-label" style={{ margin: 0 }}>
+                      Summary *
+                    </label>
+                    <span className="tiny" style={{ color: 'var(--danger, #d64545)', fontWeight: 600 }}>
+                      Mandatory
+                    </span>
+                  </div>
+                  <textarea
+                    autoFocus
+                    required
+                    rows={4}
+                    placeholder="Enter a paragraph summary of the discussion, outcome, client response, and next steps..."
+                    className="lead-modal-input"
+                    style={{
+                      height: 'auto',
+                      minHeight: 96,
+                      padding: '12px 16px',
+                      borderRadius: 16,
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                      lineHeight: 1.5,
+                      fontSize: 13.5,
+                    }}
+                    value={completeSummary}
+                    onChange={(e) => {
+                      setCompleteSummary(e.target.value)
+                      if (completeError) setCompleteError('')
+                    }}
+                  />
+                </div>
+
+                {/* Attachments Field */}
+                <div style={{ marginBottom: 16 }}>
+                  <div className="rowx sp" style={{ marginBottom: 6 }}>
+                    <label className="lead-modal-label" style={{ margin: 0 }}>
+                      Attachments
+                    </label>
+                    <span className="tiny mut">Optional · Multiple files supported</span>
+                  </div>
+
+                  <label
+                    style={{
+                      border: '1.5px dashed var(--line, rgba(0, 201, 167, 0.35))',
+                      borderRadius: 16,
+                      padding: '14px 18px',
+                      background: 'var(--surface2, rgba(240, 246, 250, 0.5))',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 10,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const dropped = Array.from(e.dataTransfer.files || [])
+                      if (dropped.length) {
+                        setCompleteAttachments((prev) => [...prev, ...dropped])
+                      }
+                    }}
+                  >
+                    <input
+                      type="file"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={handleFileChange}
+                    />
+                    <span style={{ fontSize: 18 }}>📎</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <span style={{ font: '600 12.5px var(--b)', color: 'var(--primary, #00C9A7)' }}>
+                        Choose files
+                      </span>
+                      <span className="tiny mut" style={{ marginLeft: 6 }}>
+                        or drag &amp; drop here
+                      </span>
+                    </div>
+                  </label>
+
+                  {completeAttachments.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                        maxHeight: 130,
+                        overflowY: 'auto',
+                        paddingRight: 4,
+                      }}
+                    >
+                      {completeAttachments.map((file, idx) => (
+                        <div
+                          key={`${file.name}-${idx}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'var(--surface, #fff)',
+                            border: '1px solid var(--line, rgba(0, 201, 167, 0.2))',
+                            borderRadius: 10,
+                            padding: '6px 12px',
+                            fontSize: 12,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <span>📄</span>
+                            <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{file.name}</span>
+                            <span className="tiny mut">({formatFileSize(file.size)})</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(idx)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--mut)',
+                              cursor: 'pointer',
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              fontSize: 12,
+                            }}
+                            title="Remove file"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {completeError && (
+                  <div
+                    className="tiny"
+                    style={{
+                      color: 'var(--danger, #d64545)',
+                      marginBottom: 12,
+                      background: 'rgba(214, 69, 69, 0.08)',
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                    }}
+                  >
+                    ⚠ {completeError}
+                  </div>
+                )}
+
+                <div className="lead-modal-actions" style={{ marginTop: 20 }}>
+                  <button
+                    type="button"
+                    className="btn ghost lead-modal-cancel-btn"
+                    onClick={closeCompleteModal}
+                    disabled={submittingComplete}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn pri lead-modal-submit-btn"
+                    disabled={submittingComplete || !completeSummary.trim()}
+                    style={{ minWidth: 150 }}
+                  >
+                    {submittingComplete ? 'Saving…' : 'Confirm Completed ✓'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   )
@@ -308,7 +640,7 @@ function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone
                   <span
                     className="activity-icon-badge"
                     style={{ cursor: a.status === 'open' ? 'pointer' : 'default' }}
-                    onClick={() => a.status === 'open' && onComplete(a.id)}
+                    onClick={() => a.status === 'open' && onComplete(a)}
                     title={a.status === 'open' ? 'Click to complete' : 'Completed'}
                   >
                     {typeIcon(a.activity_type)}
@@ -326,6 +658,37 @@ function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone
                       )}
                       {a.entity_type && !leadDisplayName && <span className="tiny mut">· {a.entity_type}</span>}
                     </div>
+                    {/* Display Summary / Outcome if present */}
+                    {(a.summary || a.outcome) && (
+                      <p className="tiny mut" style={{ marginTop: 5, fontStyle: 'italic', maxWidth: 650, lineHeight: 1.4 }}>
+                        “{a.summary || a.outcome}”
+                      </p>
+                    )}
+                    {/* Display Attachments if present */}
+                    {Array.isArray(a.attachments) && a.attachments.length > 0 && (
+                      <div className="rowx" style={{ gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                        {a.attachments.map((att, attIdx) => {
+                          const name = typeof att === 'string' ? att.split('/').pop() : att.file_name || att.name || 'Attachment'
+                          const url = typeof att === 'string' ? att : att.url || att.file_url
+                          return url ? (
+                            <a
+                              key={attIdx}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="chip"
+                              style={{ fontSize: 11, padding: '2px 8px', textDecoration: 'none', color: 'var(--primary, #00C9A7)' }}
+                            >
+                              📎 {name}
+                            </a>
+                          ) : (
+                            <span key={attIdx} className="chip" style={{ fontSize: 11, padding: '2px 8px' }}>
+                              📎 {name}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -339,7 +702,7 @@ function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone
                     <button
                       type="button"
                       className="activity-complete-btn"
-                      onClick={() => onComplete(a.id)}
+                      onClick={() => onComplete(a)}
                     >
                       ✓ Complete
                     </button>
@@ -354,6 +717,15 @@ function ActivitySection({ title, badgeText, items, leads = [], onComplete, tone
   )
 }
 
+function formatFileSize(bytes) {
+  if (!bytes) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
+}
+
 function typeIcon(type) {
   return { call: '☎', task: '✓', meeting: '📅', email: '✉' }[type] || '⚡'
 }
+
