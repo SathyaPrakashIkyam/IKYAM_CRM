@@ -103,8 +103,14 @@ export function AuthProvider({ children }) {
     : null
 
   const role = auth?.role || user?.role || ''
-  const isSuperAdmin = role.toUpperCase() === 'SUPER_ADMIN' || role.toUpperCase() === 'SUPER ADMIN'
-  const isCompanyAdmin = role.toUpperCase() === 'COMPANY_ADMIN' || role.toUpperCase() === 'COMPANY ADMIN'
+  const roleUpper = (role || '').toUpperCase()
+  const isSuperAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN'
+  const isCompanyAdmin =
+    roleUpper === 'COMPANY_ADMIN' ||
+    roleUpper === 'COMPANY ADMIN' ||
+    roleUpper === 'ADMIN' ||
+    roleUpper.includes('COMPANY_ADMIN') ||
+    roleUpper.includes('COMPANY ADMIN')
 
   return (
     <AuthContext.Provider

@@ -47,6 +47,7 @@ const ALL_NAV_ITEMS = [
       { to: '/product-groups', label: 'Product Groups', icon: '📁' },
       { to: '/uoms', label: 'Units of Measure', icon: '📏' },
       { to: '/currencies', label: 'Currencies', icon: '💱' },
+      { to: '/products', label: 'Products', icon: '▧', module: 'PRODUCTS' },
     ],
   },
   { to: '/roles', label: 'Role Management', icon: '🛡', module: 'ROLE_MGMT' },
@@ -72,14 +73,32 @@ function withProductsNextTo(items, ...anchorPaths) {
 }
 
 export default function AppShell({ children, aiPanel }) {
-  const { user, tenant, companies, companyId, switchCompany, logout, isSuperAdmin, isCompanyAdmin, can } = useAuth()
+  const { user, tenant, companies, companyId, switchCompany, logout, isSuperAdmin, isCompanyAdmin, can, permBypass } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const roleUpper = (user?.role || '').toUpperCase()
+  const isAdminLike =
+    isCompanyAdmin ||
+    isSuperAdmin ||
+    permBypass ||
+    roleUpper === 'ADMIN' ||
+    roleUpper.includes('ADMIN') ||
+    !!user?.is_admin
+
+  const hasMastersAccess =
+    isAdminLike ||
+    can('MASTERS', 'view') ||
+    can('MASTER', 'view') ||
+    can('PRODUCT_GROUPS', 'view') ||
+    can('UOMS', 'view') ||
+    can('CURRENCIES', 'view')
+
   const isMasterRoute =
     location.pathname.startsWith('/product-groups') ||
     location.pathname.startsWith('/uoms') ||
     location.pathname.startsWith('/currencies') ||
-    location.pathname.startsWith('/masters')
+    location.pathname.startsWith('/masters') ||
+    (hasMastersAccess && (location.pathname === '/products' || location.pathname.startsWith('/products/')))
   const [mastersOpen, setMastersOpen] = useState(isMasterRoute)
 
   useEffect(() => {
@@ -274,7 +293,17 @@ export default function AppShell({ children, aiPanel }) {
       ]
     : withProductsNextTo(
         ALL_NAV_ITEMS.filter((item) => {
-          if (item.adminOnly && !isCompanyAdmin && !isSuperAdmin) return false
+          // If Masters: show only if user has access to masters
+          if (item.to === '/masters') return hasMastersAccess
+
+          // If top-level Products: hide completely if user has access to masters
+          // (since Products is accessible inside Masters). Otherwise show if role has PRODUCTS view permission.
+          if (item.to === '/products') {
+            if (hasMastersAccess) return false
+            return !item.module || can(item.module, 'view')
+          }
+
+          if (item.adminOnly && !isAdminLike) return false
           if (item.requiresAnyOf) return item.requiresAnyOf.some((m) => can(m, 'view'))
           return !item.module || can(item.module, 'view')
         }),
@@ -396,16 +425,18 @@ export default function AppShell({ children, aiPanel }) {
 
                   {mastersOpen && !collapsed && (
                     <div className="nav-submenu">
-                      {item.children.map((child) => (
-                        <NavLink
-                          key={child.to}
-                          to={child.to}
-                          className={({ isActive }) => (isActive ? 'sel' : '')}
-                        >
-                          <span style={{ fontSize: 13, flexShrink: 0 }}>{child.icon}</span>
-                          <span>{child.label}</span>
-                        </NavLink>
-                      ))}
+                      {item.children
+                        .filter((child) => !child.module || can(child.module, 'view'))
+                        .map((child) => (
+                          <NavLink
+                            key={child.to}
+                            to={child.to}
+                            className={({ isActive }) => (isActive ? 'sel' : '')}
+                          >
+                            <span style={{ fontSize: 13, flexShrink: 0 }}>{child.icon}</span>
+                            <span>{child.label}</span>
+                          </NavLink>
+                        ))}
                     </div>
                   )}
                 </div>
