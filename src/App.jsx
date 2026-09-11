@@ -14,6 +14,7 @@ import Record from './pages/Record'
 import Accounts from './pages/Accounts'
 import Contacts from './pages/Contacts'
 import Activities from './pages/Activities'
+import LeadHistory from './pages/LeadHistory'
 import QuotesList from './pages/Quotes/QuotesList'
 import NewQuotes from './pages/Quotes/NewQuotes'
 import QuotesDetails from './pages/Quotes/QuotesDetails'
@@ -52,6 +53,7 @@ function AppRoutes() {
       <Route path="/accounts/:id" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
       <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
       <Route path="/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
+      <Route path="/leadHistory/:leadId" element={<ProtectedRoute><LeadHistory /></ProtectedRoute>} />
       <Route path="/quotes" element={<Navigate to="/quotesList" replace />} />
       <Route path="/quotesList" element={<ProtectedRoute><QuotesList /></ProtectedRoute>} />
       <Route path="/newQuotes" element={<ProtectedRoute><NewQuotes /></ProtectedRoute>} />

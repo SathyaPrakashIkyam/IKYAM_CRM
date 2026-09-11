@@ -167,12 +167,28 @@ export const activitiesApi = {
   },
   forRecord: (objectType, recordId) =>
     api.get(`/activities/for/${objectType}/${recordId}`).then((r) => r.data),
+  // Every activity for this lead — open and completed, whether logged from
+  // the Activities page or a deal converted from this lead. Use this
+  // instead of forRecord('opportunity', ...) wherever the full lead
+  // history (not just one deal's own activities) should show.
+  leadHistory: (leadId) => api.get(`/activities/lead-history/${leadId}`).then((r) => r.data),
   complete: (id, formData) =>
     api
       .post(`/activities/${id}/complete`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then((r) => r.data),
+  // Adds more files to an activity that's already completed, without
+  // reopening it or re-submitting a summary.
+  addAttachments: (id, files) => {
+    const formData = new FormData()
+    for (const file of files) formData.append('attachments', file)
+    return api
+      .post(`/activities/${id}/attachments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data)
+  },
   reopen: (id) => api.post(`/activities/${id}/reopen`).then((r) => r.data),
   getDocumentsByLeadId: (leadId) =>
     api.get(`/activities/get_documents_by_lead_id/${leadId}`).then((r) => r.data),

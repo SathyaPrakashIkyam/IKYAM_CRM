@@ -247,14 +247,6 @@
   color: #FFFFFF !important;
 }
 
-.activity-subject.completed {
-  text-decoration: line-through;
-  color: var(--mut, #8CA5AF);
-}
-
-[data-theme="dark"] .activity-subject.completed {
-  color: rgba(255, 255, 255, 0.4) !important;
-}
 
 .activity-complete-btn {
   padding: 6px 14px;

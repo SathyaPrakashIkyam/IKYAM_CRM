@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { activitiesApi, leadsApi } from '../api/endpoints'
@@ -30,6 +31,7 @@ export default function Activities() {
   const [form, setForm] = useState({ activity_type: 'call', subject: '', due_at: '', lead_id: '' })
   const [attendeeEmail, setAttendeeEmail] = useState('')
   const [newAttachments, setNewAttachments] = useState([])
+  const [formError, setFormError] = useState('')
   const { user, companyId } = useAuth()
   const provider = detectProviderFromEmail(user?.email) // 'google' | 'outlook' — based on the logged-in user's own email
   const needsProvider = form.activity_type === 'meeting' || form.activity_type === 'email'
@@ -51,6 +53,14 @@ export default function Activities() {
 
   async function createActivity(e) {
     e.preventDefault()
+    setFormError('')
+    // Every activity must be tied to a real lead — the backend rejects a
+    // missing lead_id outright now, but checking here first gives an
+    // immediate, in-form message instead of a round-trip 422.
+    if (!form.lead_id) {
+      setFormError('A lead is required — please select one from the Associated Lead dropdown.')
+      return
+    }
     const payload = {
       activity_type: form.activity_type,
       subject: form.subject,
@@ -60,29 +70,31 @@ export default function Activities() {
       // to store, instead of the naive string being reinterpreted as UTC
       // server-side (which would silently shift it by the local offset).
       due_at: form.due_at ? new Date(form.due_at).toISOString() : undefined,
-      ...(form.lead_id
-        ? {
-            lead_id: form.lead_id,
-            related_object_type: 'lead',
-            related_record_id: form.lead_id,
-          }
-        : {}),
+      lead_id: form.lead_id,
+      related_object_type: 'lead',
+      related_record_id: form.lead_id,
       attachments: newAttachments,
     }
-    const activity = await activitiesApi.create(companyId, payload)
+    try {
+      const activity = await activitiesApi.create(companyId, payload)
 
-    // Meeting/email activities open the chosen provider (Gmail/Google Calendar
-    // or Outlook/Teams) prefilled with the activity's details. This is a pure
-    // frontend redirect — the CRM has already saved the activity by this point.
-    if (needsProvider) {
-      openActivityInProvider(activity, provider, attendeeEmail)
+      // Meeting/email activities open the chosen provider (Gmail/Google Calendar
+      // or Outlook/Teams) prefilled with the activity's details. This is a pure
+      // frontend redirect — the CRM has already saved the activity by this point.
+      if (needsProvider) {
+        openActivityInProvider(activity, provider, attendeeEmail)
+      }
+
+      setForm({ activity_type: 'call', subject: '', due_at: '', lead_id: '' })
+      setAttendeeEmail('')
+      setNewAttachments([])
+      setShowNew(false)
+      load()
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : (detail?.[0]?.msg || 'Failed to create activity.')
+      setFormError(msg)
     }
-
-    setForm({ activity_type: 'call', subject: '', due_at: '', lead_id: '' })
-    setAttendeeEmail('')
-    setNewAttachments([])
-    setShowNew(false)
-    load()
   }
 
   function handleNewAttachmentChange(e) {
@@ -102,6 +114,28 @@ export default function Activities() {
   const [completeError, setCompleteError] = useState('')
   const [submittingComplete, setSubmittingComplete] = useState(false)
   const [previewModal, setPreviewModal] = useState(null)
+  const [historyModal, setHistoryModal] = useState(null)
+
+  // Every completed activity now has a lead_id (mandatory on creation) —
+  // clicking it shows the WHOLE history for that lead, not just this one
+  // card, so a rep can see everything that's happened with them in one
+  // place instead of hunting through the list for related entries.
+  async function handleOpenHistory(activity) {
+    const leadId = activity.lead_id || (activity.related_object_type === 'lead' ? activity.related_record_id : null)
+    if (!leadId) {
+      setHistoryModal({ open: true, loading: false, error: 'This activity has no associated lead to show history for.', items: [] })
+      return
+    }
+    setHistoryModal({ open: true, loading: true, error: '', items: [] })
+    try {
+      const items = await activitiesApi.leadHistory(leadId)
+      setHistoryModal({ open: true, loading: false, error: '', items: Array.isArray(items) ? items : [] })
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : (detail?.[0]?.msg || 'Failed to load activity history.')
+      setHistoryModal({ open: true, loading: false, error: msg, items: [] })
+    }
+  }
 
   async function handleOpenPreview(activity, preferredFileName) {
     const leadId =
@@ -243,7 +277,7 @@ export default function Activities() {
   const done = activities.filter((a) => a.status === 'completed')
 
   const leadOptions = [
-    { value: '', label: 'Select a lead (optional)...' },
+    { value: '', label: 'Select a lead...' },
     ...leads.map((l) => {
       const person = [l.first_name, l.last_name].filter(Boolean).join(' ') || l.name || ''
       const comp = l.company_name || ''
@@ -315,6 +349,7 @@ export default function Activities() {
               leads={leads}
               onComplete={openCompleteModal}
               onOpenPreview={handleOpenPreview}
+              onOpenHistory={handleOpenHistory}
               isDone
             />
             {activities.length === 0 && (
@@ -368,12 +403,13 @@ export default function Activities() {
                   </div>
 
                   <div>
-                    <label className="lead-modal-label">Associated Lead</label>
+                    <label className="lead-modal-label">Associated Lead *</label>
                     <CustomSelect
                       options={leadOptions}
                       value={form.lead_id}
                       onChange={(val) => {
                         setForm((prev) => ({ ...prev, lead_id: val }))
+                        if (formError) setFormError('')
                         if (val && !attendeeEmail) {
                           const selLead = leads.find((l) => l.id === val)
                           if (selLead?.email) {
@@ -381,7 +417,7 @@ export default function Activities() {
                           }
                         }
                       }}
-                      placeholder="Select a lead (optional)..."
+                      placeholder="Select a lead..."
                       style={{ width: '100%' }}
                     />
                   </div>
@@ -503,6 +539,21 @@ export default function Activities() {
                   </div>
                 )}
 
+                {formError && (
+                  <div
+                    className="tiny"
+                    style={{
+                      color: 'var(--danger, #d64545)',
+                      marginBottom: 12,
+                      background: 'rgba(214, 69, 69, 0.08)',
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                    }}
+                  >
+                    ⚠ {formError}
+                  </div>
+                )}
+
                 <div className="lead-modal-actions">
                   <button
                     type="button"
@@ -510,6 +561,7 @@ export default function Activities() {
                     onClick={() => {
                       setShowNew(false)
                       setNewAttachments([])
+                      setFormError('')
                     }}
                   >
                     Cancel
@@ -793,6 +845,77 @@ export default function Activities() {
           </div>
         )}
 
+        {/* History Modal — every activity for this lead, clicked from a completed card */}
+        {historyModal?.open && (
+          <div className="lead-modal-overlay" onClick={() => setHistoryModal(null)}>
+            <div
+              className="lead-modal-card"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: 640, width: '92vw', maxHeight: '82vh', display: 'flex', flexDirection: 'column', borderRadius: 24, padding: '24px 28px' }}
+            >
+              <div className="lead-modal-header" style={{ marginBottom: 12 }}>
+                <div className="lead-modal-title-row">
+                  <div className="lead-modal-icon-badge" style={{ color: '#0072CE', background: 'rgba(0, 114, 206, 0.12)', fontSize: 18 }}>🕘</div>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Lead Activity History</h3>
+                    <span className="tiny mut">Every call, task, meeting and email logged for this lead</span>
+                  </div>
+                </div>
+                <button type="button" className="lead-modal-close" onClick={() => setHistoryModal(null)}>✕</button>
+              </div>
+              <div className="title-bar" style={{ margin: '0 0 16px 0', width: 44, height: 3 }} />
+
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {historyModal.loading && (
+                  <div style={{ padding: '32px 24px', textAlign: 'center', color: 'var(--mut)' }}>
+                    <span className="quote-spinner" style={{ width: 18, height: 18, display: 'inline-block' }} />
+                    <div className="tiny" style={{ marginTop: 8 }}>Loading history…</div>
+                  </div>
+                )}
+                {historyModal.error && (
+                  <div className="tiny" style={{ color: 'var(--danger, #d64545)', background: 'rgba(214, 69, 69, 0.08)', padding: 14, borderRadius: 12 }}>
+                    ⚠ {historyModal.error}
+                  </div>
+                )}
+                {!historyModal.loading && !historyModal.error && historyModal.items.length === 0 && (
+                  <div className="tiny mut" style={{ padding: '24px', textAlign: 'center' }}>No activity history found for this lead.</div>
+                )}
+                {!historyModal.loading && !historyModal.error && historyModal.items.map((h) => (
+                  <div
+                    key={h.id}
+                    style={{
+                      display: 'flex',
+                      gap: 12,
+                      padding: '10px 0',
+                      borderBottom: '1px solid var(--line, rgba(0,0,0,0.06))',
+                    }}
+                  >
+                    <span style={{ fontSize: 16, flexShrink: 0, width: 26, textAlign: 'center' }}>{typeIcon(h.activity_type)}</span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="rowx sp" style={{ gap: 8 }}>
+                        <b style={{ fontSize: 13, textDecoration: h.status === 'completed' ? 'line-through' : 'none', color: 'var(--ink)' }}>
+                          {h.subject}
+                        </b>
+                        <span className="tiny mut" style={{ whiteSpace: 'nowrap' }}>
+                          {h.completed_at ? new Date(h.completed_at).toLocaleString() : h.due_at ? new Date(h.due_at).toLocaleString() : new Date(h.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="tiny mut" style={{ textTransform: 'capitalize', marginTop: 2 }}>
+                        {h.activity_type} · {h.status}
+                      </div>
+                      {h.summary && (
+                        <p style={{ margin: '6px 0 0', fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.45, fontStyle: 'italic' }}>
+                          {h.summary}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Preview Modal for Activity Documents */}
         {previewModal?.open && (
           <div className="lead-modal-overlay" onClick={() => setPreviewModal(null)}>
@@ -1016,6 +1139,7 @@ function ActivitySection({
   leads = [],
   onComplete,
   onOpenPreview,
+  onOpenHistory,
   tone,
   isDone,
 }) {
@@ -1038,7 +1162,13 @@ function ActivitySection({
           const attachedFiles = parseAttachmentsList(a.attachments)
 
           return (
-            <div className={`card hov activity-card ${isDone ? 'done' : ''}`} key={a.id}>
+            <div
+              className={`card hov activity-card ${isDone ? 'done' : ''}`}
+              key={a.id}
+              onClick={() => isDone && onOpenHistory(a)}
+              style={{ cursor: isDone ? 'pointer' : 'default' }}
+              title={isDone ? "Click to see this lead's full activity history" : undefined}
+            >
               <div className="rowx sp" style={{ width: '100%' }}>
                 <div className="rowx" style={{ gap: 14 }}>
                   <span
@@ -1131,7 +1261,7 @@ function ActivitySection({
                                 alignItems: 'center',
                                 gap: 4,
                               }}
-                              onClick={() => onOpenPreview(a, att.name)}
+                              onClick={(e) => { e.stopPropagation(); onOpenPreview(a, att.name) }}
                               title="Click to preview attachment"
                             >
                               📎 {att.name}
@@ -1151,7 +1281,7 @@ function ActivitySection({
                               color: 'var(--primary, #00C9A7)',
                               borderColor: 'var(--primary, #00C9A7)',
                             }}
-                            onClick={() => onOpenPreview(a)}
+                            onClick={(e) => { e.stopPropagation(); onOpenPreview(a) }}
                           >
                             👁 Preview
                           </button>
