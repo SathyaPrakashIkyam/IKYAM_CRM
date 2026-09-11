@@ -189,6 +189,18 @@ export const activitiesApi = {
       })
       .then((r) => r.data)
   },
+  // Same result as addAttachments above, over the separate PATCH route —
+  // used by the Lead History screen, which is patching an existing
+  // activity's attachments rather than the POST route's create-style use.
+  patchAttachments: (id, files) => {
+    const formData = new FormData()
+    for (const file of files) formData.append('attachments', file)
+    return api
+      .patch(`/activities/${id}/attachments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data)
+  },
   reopen: (id) => api.post(`/activities/${id}/reopen`).then((r) => r.data),
   getDocumentsByLeadId: (leadId) =>
     api.get(`/activities/get_documents_by_lead_id/${leadId}`).then((r) => r.data),

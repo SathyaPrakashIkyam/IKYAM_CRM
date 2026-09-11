@@ -328,6 +328,7 @@ export default function Activities() {
               leads={leads}
               onComplete={openCompleteModal}
               onOpenPreview={handleOpenPreview}
+              onAttachmentAdded={load}
               tone="risk"
             />
             <ActivitySection
@@ -337,6 +338,7 @@ export default function Activities() {
               leads={leads}
               onComplete={openCompleteModal}
               onOpenPreview={handleOpenPreview}
+              onAttachmentAdded={load}
             />
             <ActivitySection
               title="Completed"
@@ -346,6 +348,7 @@ export default function Activities() {
               onComplete={openCompleteModal}
               onOpenPreview={handleOpenPreview}
               onOpenHistory={handleOpenHistory}
+              onAttachmentAdded={load}
               isDone
             />
             {activities.length === 0 && (
@@ -1136,10 +1139,36 @@ function ActivitySection({
   onComplete,
   onOpenPreview,
   onOpenHistory,
+  onAttachmentAdded,
   tone,
   isDone,
 }) {
   const navigate = useNavigate()
+  // id of the activity currently uploading a file, if any — lets each
+  // card's own inline "Attach" control show its own busy state.
+  const [uploadingId, setUploadingId] = useState(null)
+  // { id, message } — kept together so the error only ever renders under
+  // the one card that actually failed, not every card in the section.
+  const [attachError, setAttachError] = useState(null)
+
+  async function handleAttach(activityId, e) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (files.length === 0) return
+    setUploadingId(activityId)
+    setAttachError(null)
+    try {
+      await activitiesApi.patchAttachments(activityId, files)
+      onAttachmentAdded?.()
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : (detail?.[0]?.msg || 'Failed to add attachment.')
+      setAttachError({ id: activityId, message: msg })
+    } finally {
+      setUploadingId(null)
+    }
+  }
+
   if (items.length === 0) return null
   return (
     <div className="activity-section">
@@ -1258,54 +1287,84 @@ function ActivitySection({
                       </div>
                     )}
 
-                    {/* Attachments Section with Preview */}
-                    {attachedFiles.length > 0 && (
-                      <div style={{ marginTop: 8 }}>
-                        <div className="rowx" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span className="tiny mut" style={{ fontWeight: 600 }}>
-                            Attachments ({attachedFiles.length}):
-                          </span>
-                          {attachedFiles.map((att, attIdx) => (
-                            <span
-                              key={attIdx}
-                              className="chip"
+                    {/* Attachments Section with Preview + inline Attach */}
+                    <div style={{ marginTop: 8 }}>
+                      <div className="rowx" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {attachedFiles.length > 0 && (
+                          <>
+                            <span className="tiny mut" style={{ fontWeight: 600 }}>
+                              Attachments ({attachedFiles.length}):
+                            </span>
+                            {attachedFiles.map((att, attIdx) => (
+                              <span
+                                key={attIdx}
+                                className="chip"
+                                style={{
+                                  fontSize: 11.5,
+                                  padding: '3px 10px',
+                                  background: 'var(--surface2, rgba(240, 246, 250, 0.9))',
+                                  border: '1px solid var(--line, rgba(0, 201, 167, 0.25))',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                }}
+                                onClick={(e) => { e.stopPropagation(); onOpenPreview(a, att.name) }}
+                                title="Click to preview attachment"
+                              >
+                                📎 {att.name}
+                              </span>
+                            ))}
+                            <button
+                              type="button"
+                              className="btn ghost"
                               style={{
-                                fontSize: 11.5,
                                 padding: '3px 10px',
-                                background: 'var(--surface2, rgba(240, 246, 250, 0.9))',
-                                border: '1px solid var(--line, rgba(0, 201, 167, 0.25))',
-                                cursor: 'pointer',
+                                fontSize: 11.5,
+                                height: 26,
+                                borderRadius: 14,
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: 4,
+                                color: 'var(--primary, #00C9A7)',
+                                borderColor: 'var(--primary, #00C9A7)',
                               }}
-                              onClick={(e) => { e.stopPropagation(); onOpenPreview(a, att.name) }}
-                              title="Click to preview attachment"
+                              onClick={(e) => { e.stopPropagation(); onOpenPreview(a) }}
                             >
-                              📎 {att.name}
-                            </span>
-                          ))}
-                          <button
-                            type="button"
-                            className="btn ghost"
-                            style={{
-                              padding: '3px 10px',
-                              fontSize: 11.5,
-                              height: 26,
-                              borderRadius: 14,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              color: 'var(--primary, #00C9A7)',
-                              borderColor: 'var(--primary, #00C9A7)',
-                            }}
-                            onClick={(e) => { e.stopPropagation(); onOpenPreview(a) }}
-                          >
-                            👁 Preview
-                          </button>
-                        </div>
+                              👁 Preview
+                            </button>
+                          </>
+                        )}
+                        {/* Inline attach — right on this activity's own line */}
+                        <label
+                          className="tiny"
+                          style={{
+                            cursor: uploadingId === a.id ? 'wait' : 'pointer',
+                            color: 'var(--primary, #00C9A7)',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '3px 10px',
+                            borderRadius: 14,
+                            border: '1px dashed var(--line, rgba(0, 201, 167, 0.35))',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="file"
+                            multiple
+                            hidden
+                            disabled={uploadingId === a.id}
+                            onChange={(e) => handleAttach(a.id, e)}
+                          />
+                          📎 {uploadingId === a.id ? 'Uploading…' : '+ Attach'}
+                        </label>
                       </div>
-                    )}
+                      {attachError?.id === a.id && (
+                        <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginTop: 4 }}>⚠ {attachError.message}</div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

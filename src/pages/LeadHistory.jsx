@@ -16,28 +16,41 @@ function getFileSrc(file) {
   return `data:${mime};base64,${file.base64_data}`
 }
 
-function formatFileSize(bytes) {
-  if (!bytes) return ''
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
+// activity.attachments is a comma-separated list of stored file paths — just
+// enough to know an activity HAS files and their names, without fetching
+// the (much heavier) base64 content for every file on every activity up
+// front. Full content is only fetched lazily, on an actual click.
+function parseAttachmentNames(attachments) {
+  if (!attachments) return []
+  return attachments
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => p.split(/[/\\]/).pop())
 }
 
 // Full-screen view (not a modal) of everything tied to one lead: the whole
 // activity log — whether logged from the Activities page or a deal
-// converted from this lead — plus every file attached across all of it in
-// one place, so a rep can actually review a lead's history properly instead
-// of squinting at a small popup.
+// converted from this lead — with each activity's own attached files shown
+// inline and previewable, so a rep can actually review a lead's history
+// properly instead of squinting at a small popup.
 export default function LeadHistory() {
   const { leadId } = useParams()
   const navigate = useNavigate()
   const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
-  const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeFile, setActiveFile] = useState(null) // { file, docSubject }
+  const [activeFile, setActiveFile] = useState(null)
+  const [fileLoading, setFileLoading] = useState(false)
+  const [fileError, setFileError] = useState('')
+  // Cached only once the first file is actually opened — never fetched
+  // just because the page loaded.
+  const [documentsCache, setDocumentsCache] = useState(null)
+  // id of the activity currently uploading a file, if any — lets each
+  // card's own "Attach" control show its own busy state independently.
+  const [uploadingId, setUploadingId] = useState(null)
+  const [uploadError, setUploadError] = useState('')
 
   useEffect(() => {
     if (!leadId) return
@@ -46,20 +59,67 @@ export default function LeadHistory() {
     Promise.all([
       leadsApi.get(leadId).catch(() => null),
       activitiesApi.leadHistory(leadId).catch(() => []),
-      activitiesApi.getDocumentsByLeadId(leadId).catch(() => ({ documents: [] })),
     ])
-      .then(([leadData, activityData, docsData]) => {
+      .then(([leadData, activityData]) => {
         setLead(leadData)
         setActivities(Array.isArray(activityData) ? activityData : [])
-        setDocuments(Array.isArray(docsData?.documents) ? docsData.documents : [])
       })
       .catch(() => setError('Failed to load this lead\'s history.'))
       .finally(() => setLoading(false))
   }, [leadId])
 
-  const allFiles = documents.flatMap((d) =>
-    (d.files || []).map((f) => ({ ...f, docSubject: d.subject, docType: d.activity_type }))
-  )
+  // Only called the moment a file is actually clicked — fetches (and
+  // caches) the full documents-with-content payload for this lead, then
+  // opens the one file that was clicked.
+  async function openFile(activityId, fileName, docSubject) {
+    setFileError('')
+    let docs = documentsCache
+    if (!docs) {
+      setFileLoading(true)
+      try {
+        const res = await activitiesApi.getDocumentsByLeadId(leadId)
+        docs = Array.isArray(res?.documents) ? res.documents : []
+        setDocumentsCache(docs)
+      } catch (err) {
+        setFileError('Failed to load this file.')
+        setFileLoading(false)
+        return
+      }
+      setFileLoading(false)
+    }
+    const doc = docs.find((d) => d.activity_id === activityId)
+    const file = doc?.files?.find((f) => f.file_name === fileName)
+    if (!file) {
+      setFileError('This file could not be found.')
+      return
+    }
+    setActiveFile({ ...file, docSubject })
+  }
+
+  // Adds a file directly to the activity whose card this was clicked from,
+  // via the PATCH /activities/{id}/attachments route — works whether that
+  // activity is open or already completed, no reopening or summary needed.
+  async function handleAddAttachment(activityId, e) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (files.length === 0) return
+    setUploadingId(activityId)
+    setUploadError('')
+    try {
+      const updated = await activitiesApi.patchAttachments(activityId, files)
+      setActivities((prev) => prev.map((a) => (a.id === activityId ? { ...a, attachments: updated.attachments } : a)))
+      // The cache no longer reflects the newly added file — dropped so the
+      // next click on any file re-fetches fresh content instead of showing
+      // stale data.
+      setDocumentsCache(null)
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : (detail?.[0]?.msg || 'Failed to add attachment.')
+      setUploadError(msg)
+    } finally {
+      setUploadingId(null)
+    }
+  }
 
   return (
     <AppShell>
@@ -72,7 +132,7 @@ export default function LeadHistory() {
                 {lead ? `${lead.name || [lead.first_name, lead.last_name].filter(Boolean).join(' ')} — ${lead.company_name || ''}` : 'Lead History'}
               </h2>
               <div className="goal" style={{ marginTop: 2 }}>
-                {lead?.lead_no ? `${lead.lead_no} · ` : ''}Every activity and file logged for this lead
+                {lead?.lead_no ? `${lead.lead_no} · ` : ''}Every activity logged for this lead
               </div>
             </div>
           </div>
@@ -93,100 +153,123 @@ export default function LeadHistory() {
         )}
 
         {!loading && !error && (
-          <div className="rec" style={{ gridTemplateColumns: '1fr 360px', gap: 24 }}>
-            {/* Activity log */}
-            <div>
-              <div className="lab" style={{ marginBottom: 8 }}>Activity Log ({activities.length})</div>
-              <div className="frame activities-main-frame" style={{ padding: 4 }}>
-                <div className="activities-scroll-pane">
-                  {activities.length === 0 && (
-                    <div className="tiny mut" style={{ padding: 24, textAlign: 'center' }}>No activities logged for this lead yet.</div>
-                  )}
-                  {activities.length > 0 && (
-                    <div className="activity-cards-list" style={{ padding: '8px 4px' }}>
-                      {activities.map((a) => (
-                        <div className="card activity-card" key={a.id}>
-                          <div className="rowx sp" style={{ width: '100%' }}>
-                            <div className="rowx" style={{ gap: 14 }}>
-                              <span className="activity-icon-badge">{typeIcon(a.activity_type)}</span>
-                              <div>
-                                <b className="activity-subject">{a.subject}</b>
-                                <div className="tiny mut" style={{ textTransform: 'capitalize', marginTop: 2 }}>
-                                  {a.activity_type} · {a.status}
+          <div className="frame activities-main-frame">
+            <div className="activities-scroll-pane">
+              {activities.length === 0 && (
+                <div className="tiny mut" style={{ padding: 24, textAlign: 'center' }}>No activities logged for this lead yet.</div>
+              )}
+              {activities.length > 0 && (
+                <div className="activity-cards-list" style={{ padding: '8px 4px' }}>
+                  {activities.map((a) => {
+                    const fileNames = parseAttachmentNames(a.attachments)
+                    return (
+                      <div className="card activity-card" key={a.id}>
+                        <div className="rowx sp" style={{ width: '100%' }}>
+                          <div className="rowx" style={{ gap: 14 }}>
+                            <span className="activity-icon-badge">{typeIcon(a.activity_type)}</span>
+                            <div>
+                              <b className="activity-subject">{a.subject}</b>
+                              <div className="tiny mut" style={{ textTransform: 'capitalize', marginTop: 2 }}>
+                                {a.activity_type} · {a.status}
+                              </div>
+                              {a.summary && (
+                                <div
+                                  style={{
+                                    marginTop: 8,
+                                    background: 'rgba(0, 201, 167, 0.07)',
+                                    borderLeft: '3px solid var(--primary, #00C9A7)',
+                                    padding: '6px 12px',
+                                    borderRadius: '0 10px 10px 0',
+                                    maxWidth: 560,
+                                  }}
+                                >
+                                  <p style={{ margin: 0, fontSize: 13, color: 'var(--ink)', lineHeight: 1.45 }}>{a.summary}</p>
                                 </div>
-                                {a.summary && (
-                                  <div
-                                    style={{
-                                      marginTop: 8,
-                                      background: 'rgba(0, 201, 167, 0.07)',
-                                      borderLeft: '3px solid var(--primary, #00C9A7)',
-                                      padding: '6px 12px',
-                                      borderRadius: '0 10px 10px 0',
-                                      maxWidth: 560,
-                                    }}
-                                  >
-                                    <p style={{ margin: 0, fontSize: 13, color: 'var(--ink)', lineHeight: 1.45 }}>{a.summary}</p>
-                                  </div>
+                              )}
+                              <div className="rowx" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                                {fileNames.length > 0 && (
+                                  <>
+                                    <span className="tiny mut" style={{ fontWeight: 600 }}>Attachments ({fileNames.length}):</span>
+                                    {fileNames.map((name, fIdx) => (
+                                      <span
+                                        key={fIdx}
+                                        className="chip"
+                                        style={{
+                                          fontSize: 11.5,
+                                          padding: '3px 10px',
+                                          background: 'var(--surface2, rgba(240, 246, 250, 0.9))',
+                                          border: '1px solid var(--line, rgba(0, 201, 167, 0.25))',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 4,
+                                        }}
+                                        onClick={() => openFile(a.id, name, a.subject)}
+                                        title="Click to preview attachment"
+                                      >
+                                        📎 {name}
+                                      </span>
+                                    ))}
+                                  </>
                                 )}
+                                {/* Inline attach — right on this activity's own line, not a
+                                    separate page-level picker */}
+                                <label
+                                  className="tiny"
+                                  style={{
+                                    cursor: uploadingId === a.id ? 'wait' : 'pointer',
+                                    color: 'var(--primary, #00C9A7)',
+                                    fontWeight: 600,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    padding: '3px 10px',
+                                    borderRadius: 14,
+                                    border: '1px dashed var(--line, rgba(0, 201, 167, 0.35))',
+                                  }}
+                                >
+                                  <input
+                                    type="file"
+                                    multiple
+                                    hidden
+                                    disabled={uploadingId === a.id}
+                                    onChange={(e) => handleAddAttachment(a.id, e)}
+                                  />
+                                  📎 {uploadingId === a.id ? 'Uploading…' : '+ Attach'}
+                                </label>
                               </div>
                             </div>
-                            <span className="tiny mut" style={{ whiteSpace: 'nowrap' }}>
-                              {a.completed_at
-                                ? new Date(a.completed_at).toLocaleString()
-                                : a.due_at
-                                ? new Date(a.due_at).toLocaleString()
-                                : new Date(a.created_at).toLocaleDateString()}
-                            </span>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Files */}
-            <div>
-              <div className="lab" style={{ marginBottom: 8 }}>Files ({allFiles.length})</div>
-              <div className="card" style={{ padding: 12 }}>
-                {allFiles.length === 0 && (
-                  <div className="tiny mut" style={{ padding: '16px 4px', textAlign: 'center' }}>No files attached to this lead's activities.</div>
-                )}
-                {allFiles.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {allFiles.map((f, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => setActiveFile(f)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          padding: '8px 10px',
-                          borderRadius: 10,
-                          border: '1px solid var(--line, rgba(0,0,0,0.08))',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <span style={{ fontSize: 18 }}>📄</span>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {f.file_name}
-                          </div>
-                          <div className="tiny mut" style={{ marginTop: 1 }}>
-                            {f.docSubject}{f.size ? ` · ${formatFileSize(f.size)}` : ''}
-                          </div>
+                          <span className="tiny mut" style={{ whiteSpace: 'nowrap' }}>
+                            {a.completed_at
+                              ? new Date(a.completed_at).toLocaleString()
+                              : a.due_at
+                              ? new Date(a.due_at).toLocaleString()
+                              : new Date(a.created_at).toLocaleDateString()}
+                          </span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
+
+        {fileError && (
+          <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginTop: 10 }}>⚠ {fileError}</div>
+        )}
       </div>
+
+      {fileLoading && !activeFile && (
+        <div className="lead-modal-overlay">
+          <div className="lead-modal-card" style={{ maxWidth: 320, padding: '28px', textAlign: 'center' }}>
+            <span className="quote-spinner" style={{ width: 20, height: 20, display: 'inline-block' }} />
+            <div className="tiny" style={{ marginTop: 10 }}>Loading file…</div>
+          </div>
+        </div>
+      )}
 
       {/* File viewer */}
       {activeFile && (
