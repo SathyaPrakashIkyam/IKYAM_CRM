@@ -24,6 +24,7 @@ const ACTIVITY_TYPE_OPTIONS = [
 ]
 
 export default function Activities() {
+  const navigate = useNavigate()
   const [activities, setActivities] = useState([])
   const [leads, setLeads] = useState([])
   const [filter, setFilter] = useState('all')
@@ -120,21 +121,16 @@ export default function Activities() {
   // clicking it shows the WHOLE history for that lead, not just this one
   // card, so a rep can see everything that's happened with them in one
   // place instead of hunting through the list for related entries.
-  async function handleOpenHistory(activity) {
-    const leadId = activity.lead_id || (activity.related_object_type === 'lead' ? activity.related_record_id : null)
-    if (!leadId) {
-      setHistoryModal({ open: true, loading: false, error: 'This activity has no associated lead to show history for.', items: [] })
+  function handleOpenHistory(activity) {
+    const leadId =
+      activity.lead_id ||
+      (activity.related_object_type === 'lead' ? activity.related_record_id : null) ||
+      leads.find((l) => l.id === activity.lead_id || l.id === activity.related_record_id)?.id
+    if (leadId) {
+      navigate(`/leadHistory/${leadId}`)
       return
     }
-    setHistoryModal({ open: true, loading: true, error: '', items: [] })
-    try {
-      const items = await activitiesApi.leadHistory(leadId)
-      setHistoryModal({ open: true, loading: false, error: '', items: Array.isArray(items) ? items : [] })
-    } catch (err) {
-      const detail = err?.response?.data?.detail
-      const msg = typeof detail === 'string' ? detail : (detail?.[0]?.msg || 'Failed to load activity history.')
-      setHistoryModal({ open: true, loading: false, error: msg, items: [] })
-    }
+    setHistoryModal({ open: true, loading: false, error: 'This activity has no associated lead to show history for.', items: [] })
   }
 
   async function handleOpenPreview(activity, preferredFileName) {
@@ -1143,6 +1139,7 @@ function ActivitySection({
   tone,
   isDone,
 }) {
+  const navigate = useNavigate()
   if (items.length === 0) return null
   return (
     <div className="activity-section">
@@ -1152,12 +1149,26 @@ function ActivitySection({
       </div>
       <div className="activity-cards-list">
         {items.map((a) => {
-          const linkedLead = leads.find((l) => l.id === a.lead_id || l.id === a.related_record_id)
+          const leadId =
+            a.lead_id ||
+            (a.related_object_type === 'lead' ? a.related_record_id : null) ||
+            (a.entity_type === 'lead' ? a.related_record_id : null) ||
+            a.lead?.id ||
+            null
+
+          const linkedLead = leadId
+            ? leads.find((l) => String(l.id) === String(leadId))
+            : (a.related_record_id ? leads.find((l) => String(l.id) === String(a.related_record_id)) : null)
+
+          const effectiveLeadId = leadId || linkedLead?.id || null
+
           const leadDisplayName = linkedLead
             ? [linkedLead.first_name, linkedLead.last_name].filter(Boolean).join(' ') ||
               linkedLead.name ||
-              linkedLead.company_name
-            : a.lead_name || (a.entity_type === 'lead' ? 'Lead' : null)
+              linkedLead.company_name ||
+              linkedLead.lead_no ||
+              'Lead'
+            : a.lead_name || a.lead?.name || (effectiveLeadId ? `Lead (${String(effectiveLeadId).slice(0, 8)})` : 'Unassigned Lead')
 
           const attachedFiles = parseAttachmentsList(a.attachments)
 
@@ -1185,26 +1196,33 @@ function ActivitySection({
                     </b>
                     <div
                       className="rowx"
-                      style={{ gap: 8, marginTop: 3, alignItems: 'center', flexWrap: 'wrap' }}
+                      style={{ gap: 8, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}
                     >
                       <span className="tiny mut" style={{ textTransform: 'capitalize' }}>
                         {a.activity_type}
                       </span>
-                      {leadDisplayName && (
-                        <span
-                          className="chip"
-                          style={{
-                            fontSize: 10.5,
-                            padding: '1px 7px',
-                            background: 'rgba(0, 114, 206, 0.08)',
-                            color: '#0072CE',
-                            fontWeight: 600,
-                          }}
-                        >
-                          👤 {leadDisplayName}
-                        </span>
-                      )}
-                      {a.entity_type && !leadDisplayName && (
+
+                      {/* Lead badge shown for all activities - clicking navigates to /leadHistory/:leadId */}
+                      <span
+                        className={`lead-clickable-tag ${!effectiveLeadId ? 'unassigned' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (effectiveLeadId) {
+                            navigate(`/leadHistory/${effectiveLeadId}`)
+                          }
+                        }}
+                        title={
+                          effectiveLeadId
+                            ? `Click to view activity history for ${leadDisplayName}`
+                            : 'No lead associated with this activity'
+                        }
+                      >
+                        <span style={{ fontSize: 11 }}>👤</span>
+                        <span>{leadDisplayName}</span>
+                        {effectiveLeadId && <span style={{ fontSize: 9, opacity: 0.8 }}>↗</span>}
+                      </span>
+
+                      {a.entity_type && a.entity_type !== 'lead' && (
                         <span className="tiny mut">· {a.entity_type}</span>
                       )}
                     </div>
