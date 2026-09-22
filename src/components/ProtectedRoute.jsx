@@ -10,8 +10,8 @@ export default function ProtectedRoute({ children, companyAdminOnly }) {
   if (!auth) {
     return <Navigate to="/login" replace />
   }
-  if (companyAdminOnly && !isCompanyAdmin && !isSuperAdmin) {
-    return <Navigate to="/today" replace />
-  }
+  // if (companyAdminOnly && !isCompanyAdmin && !isSuperAdmin) {
+  //   return <Navigate to="/today" replace />
+  // }
   return children
 }

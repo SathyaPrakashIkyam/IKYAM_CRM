@@ -22,6 +22,7 @@ import Products from './pages/Products'
 import ProductGroups from './pages/ProductGroups'
 import Uoms from './pages/Uoms'
 import Currencies from './pages/Currencies'
+import ProductPriceList from './pages/ProductPriceList'
 import RoleManagement from './pages/RoleManagement'
 import SyncMonitor from './pages/SyncMonitor'
 import Dashboard from './pages/Dashboard'
@@ -67,6 +68,9 @@ function AppRoutes() {
       <Route path="/masters/uoms" element={<ProtectedRoute companyAdminOnly><Uoms /></ProtectedRoute>} />
       <Route path="/currencies" element={<ProtectedRoute companyAdminOnly><Currencies /></ProtectedRoute>} />
       <Route path="/masters/currencies" element={<ProtectedRoute companyAdminOnly><Currencies /></ProtectedRoute>} />
+      <Route path="/price-lists" element={<ProtectedRoute><ProductPriceList /></ProtectedRoute>} />
+      <Route path="/masters/price-lists" element={<ProtectedRoute><ProductPriceList /></ProtectedRoute>} />
+      <Route path="/product-price-list" element={<Navigate to="/price-lists" replace />} />
       <Route path="/roles" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
       <Route path="/sync" element={<ProtectedRoute><SyncMonitor /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

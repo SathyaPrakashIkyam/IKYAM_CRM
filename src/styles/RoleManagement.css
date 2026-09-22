@@ -1,21 +1,41 @@
 /* Role Master & Permissions screen — layout specific to this page only. */
 
+.role-mgmt-page {
+  flex: 1;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .role-mgmt-grid {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .role-mgmt-rolelist,
 .role-mgmt-permissions {
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .role-mgmt-header {
   display: flex;
   gap: 10px;
   align-items: flex-start;
+  flex-shrink: 0;
 }
 
 .role-mgmt-icon {
@@ -35,7 +55,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 60vh;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -47,6 +68,7 @@
   border-radius: 10px;
   cursor: pointer;
   border: 1px solid transparent;
+  flex-shrink: 0;
 }
 
 .role-mgmt-row:hover {
@@ -84,6 +106,9 @@
 
 .role-mgmt-table-wrap {
   margin-top: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   overflow-x: auto;
   border: 1.5px solid var(--line, #EFE4D6);
   border-radius: 16px;
@@ -96,6 +121,23 @@
   border-color: rgba(255, 255, 255, 0.14);
 }
 
+.role-mgmt-table-wrap::-webkit-scrollbar,
+.role-mgmt-list::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.role-mgmt-table-wrap::-webkit-scrollbar-thumb,
+.role-mgmt-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 201, 167, 0.35);
+  border-radius: 4px;
+}
+
+[data-theme="dark"] .role-mgmt-table-wrap::-webkit-scrollbar-thumb,
+[data-theme="dark"] .role-mgmt-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .role-mgmt-table {
   width: 100%;
   border-collapse: collapse;
@@ -104,7 +146,10 @@
 }
 
 .role-mgmt-table thead th {
-  background: rgba(0, 0, 0, 0.02);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #FAF6F0;
   color: var(--mut, #617A84);
   text-align: center;
   font: 700 11px var(--b);
@@ -115,7 +160,7 @@
 }
 
 [data-theme="dark"] .role-mgmt-table thead th {
-  background: rgba(255, 255, 255, 0.03);
+  background: #0E2930;
   border-color: rgba(255, 255, 255, 0.12);
   color: var(--mut, #8CA5AF);
 }
@@ -162,7 +207,21 @@
 }
 
 @media (max-width: 940px) {
+  .role-mgmt-page {
+    height: auto;
+    overflow: visible;
+  }
   .role-mgmt-grid {
     grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
+  }
+  .role-mgmt-rolelist,
+  .role-mgmt-permissions {
+    height: auto;
+    overflow: visible;
+  }
+  .role-mgmt-table-wrap {
+    max-height: 60vh;
   }
 }

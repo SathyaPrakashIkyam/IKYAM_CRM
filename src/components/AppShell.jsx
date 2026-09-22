@@ -34,19 +34,17 @@ const ALL_NAV_ITEMS = [
   { to: '/dashboard', label: 'Analytics', icon: '📊', module: 'ANALYTICS' },
   { to: '/executive', label: 'Executive overview', icon: '◈', module: 'EXECUTIVE' },
   { to: '/sync', label: 'Sync Monitor', icon: '⟲', module: 'SYNC_MONITOR' },
-  // Admin cluster — kept together and in this exact order (User Management,
-  // Products, Masters [Product Groups, UOMs, Currencies], Role Management, Settings)
   { to: '/users', label: 'User Management', icon: '👤', module: 'USER_MGMT' },
-  { to: '/products', label: 'Products', icon: '▧', module: 'PRODUCTS' },
   {
     to: '/masters',
     label: 'Masters',
     icon: '🗂',
-    adminOnly: true,
+    adminOnly: false,
     children: [
       { to: '/product-groups', label: 'Product Groups', icon: '📁' },
       { to: '/uoms', label: 'Units of Measure', icon: '📏' },
       { to: '/currencies', label: 'Currencies', icon: '💱' },
+      { to: '/price-lists', label: 'Price Lists', icon: '💰', module: 'PRICE_LISTS' },
       { to: '/products', label: 'Products', icon: '▧', module: 'PRODUCTS' },
     ],
   },
@@ -91,12 +89,14 @@ export default function AppShell({ children, aiPanel }) {
     can('MASTER', 'view') ||
     can('PRODUCT_GROUPS', 'view') ||
     can('UOMS', 'view') ||
-    can('CURRENCIES', 'view')
+    can('CURRENCIES', 'view') ||
+    can('PRICE_LISTS', 'view')
 
   const isMasterRoute =
     location.pathname.startsWith('/product-groups') ||
     location.pathname.startsWith('/uoms') ||
     location.pathname.startsWith('/currencies') ||
+    location.pathname.startsWith('/price-lists') ||
     location.pathname.startsWith('/masters') ||
     (hasMastersAccess && (location.pathname === '/products' || location.pathname.startsWith('/products/')))
   const [mastersOpen, setMastersOpen] = useState(isMasterRoute)
@@ -122,15 +122,24 @@ export default function AppShell({ children, aiPanel }) {
   const searchBoxRef = useRef(null)
   const notifBoxRef = useRef(null)
 
-  useEffect(() => {
-    if (!companyId || isSuperAdmin) return
+  const [searchLoaded, setSearchLoaded] = useState(false)
+  const searchLoadingRef = useRef(false)
+
+  function fetchSearchData() {
+    if (searchLoadingRef.current || searchLoaded || !companyId || isSuperAdmin) return
+    searchLoadingRef.current = true
+    setSearchLoaded(true)
     if (can('LEADS', 'view')) leadsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, leads: d }))).catch(() => {})
     if (can('ACCOUNTS', 'view')) accountsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, accounts: d }))).catch(() => {})
     if (can('CONTACTS', 'view')) contactsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, contacts: d }))).catch(() => {})
-    // if (can('QUOTES', 'view')) quotesApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, quotes: d }))).catch(() => {})
-    // if (can('REPORTS', 'view')) reportsApi.saved().then((d) => setSearchData((s) => ({ ...s, reports: d }))).catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, isSuperAdmin])
+  }
+
+  // Trigger search data fetch only when search query is entered
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      fetchSearchData()
+    }
+  }, [searchQuery])
 
   useEffect(() => {
     if (!searchOpen) return
@@ -199,7 +208,6 @@ export default function AppShell({ children, aiPanel }) {
 
   useEffect(() => {
     if (!isStandardUser) return
-    notificationsApi.list().then(setNotifs).catch(() => {})
 
     // Live push: the backend sends a "notification" event over this socket
     // the instant a reminder (e.g. "meeting in 15 minutes") is created, so
@@ -227,19 +235,22 @@ export default function AppShell({ children, aiPanel }) {
       ws.onerror = () => {}
     }
 
-    // Fallback poll — covers the gap if the socket drops/reconnects, or the
-    // reminder was created while this tab was closed.
-    const poll = setInterval(() => {
-      notificationsApi.list().then(setNotifs).catch(() => {})
-    }, 60000)
-
     return () => {
-      clearInterval(poll)
       clearTimeout(toastTimerRef.current)
       ws?.close()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  function handleNotifClick() {
+    setNotifOpen((prev) => {
+      const next = !prev
+      if (next) {
+        notificationsApi.list().then(setNotifs).catch(() => {})
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!notifOpen) return
@@ -342,7 +353,11 @@ export default function AppShell({ children, aiPanel }) {
             background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lift)',
             cursor: 'pointer',
           }}
-          onClick={() => { setToast(null); setNotifOpen(true) }}
+          onClick={() => {
+            setToast(null)
+            setNotifOpen(true)
+            notificationsApi.list().then(setNotifs).catch(() => {})
+          }}
         >
           <span style={{ fontSize: 18, lineHeight: 1 }}>🔔</span>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -498,8 +513,17 @@ export default function AppShell({ children, aiPanel }) {
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true) }}
-              onFocus={() => searchQuery && setSearchOpen(true)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setSearchOpen(true)
+                if (e.target.value.trim()) fetchSearchData()
+              }}
+              onFocus={() => {
+                if (searchQuery.trim()) {
+                  setSearchOpen(true)
+                  fetchSearchData()
+                }
+              }}
               onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); e.target.blur() } }}
               placeholder="Search leads, accounts and quotes"
               style={{
@@ -588,7 +612,7 @@ export default function AppShell({ children, aiPanel }) {
               <button
                 type="button"
                 className="icobtn"
-                onClick={() => setNotifOpen((v) => !v)}
+                onClick={handleNotifClick}
                 style={{ cursor: 'pointer', borderRadius: '50%', width: 38, height: 38 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

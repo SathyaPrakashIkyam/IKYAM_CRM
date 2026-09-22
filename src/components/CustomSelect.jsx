@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import '../styles/CustomSelect.css'
 
 /**
@@ -24,7 +24,11 @@ export default function CustomSelect({
   const [isOpen, setIsOpen] = useState(false)
   const [openUpward, setOpenUpward] = useState(false)
   const [dropdownMaxHeight, setDropdownMaxHeight] = useState(200)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const containerRef = useRef(null)
+  const triggerRef = useRef(null)
+  const optionRefs = useRef([])
+  const listboxId = useId()
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -69,13 +73,38 @@ export default function CustomSelect({
     return String(value) === String(optValue)
   }
 
-  // Handle option click
+  // Initialize highlighted index when opened
+  useEffect(() => {
+    if (isOpen) {
+      if (options.length > 0) {
+        const selectedIdx = options.findIndex((opt) => isSelected(opt.value))
+        setHighlightedIndex(selectedIdx >= 0 ? selectedIdx : 0)
+      } else {
+        setHighlightedIndex(-1)
+      }
+    } else {
+      setHighlightedIndex(-1)
+    }
+  }, [isOpen, options, value])
+
+  // Scroll highlighted option into view
+  useEffect(() => {
+    if (isOpen && highlightedIndex >= 0 && optionRefs.current[highlightedIndex]) {
+      optionRefs.current[highlightedIndex].scrollIntoView({
+        block: 'nearest',
+        inline: 'nearest',
+      })
+    }
+  }, [highlightedIndex, isOpen])
+
+  // Handle option selection
   function handleSelect(optValue) {
     if (!onChange) return
 
     if (!multiple) {
       onChange(optValue)
       setIsOpen(false)
+      triggerRef.current?.focus()
       return
     }
 
@@ -102,6 +131,82 @@ export default function CustomSelect({
     }
 
     onChange(newValues)
+  }
+
+  // Handle keyboard navigation
+  function handleKeyDown(e) {
+    if (!options || options.length === 0) return
+
+    // When dropdown is CLOSED
+    if (!isOpen) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault()
+        setIsOpen(true)
+        const selectedIdx = options.findIndex((opt) => isSelected(opt.value))
+        if (e.key === 'ArrowUp') {
+          setHighlightedIndex(selectedIdx >= 0 ? selectedIdx : options.length - 1)
+        } else {
+          setHighlightedIndex(selectedIdx >= 0 ? selectedIdx : 0)
+        }
+      }
+      return
+    }
+
+    // When dropdown is OPEN
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlightedIndex((prev) => (prev < options.length - 1 ? prev + 1 : 0))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : options.length - 1))
+    } else if (e.key === 'Tab') {
+      e.preventDefault()
+      if (e.shiftKey) {
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : options.length - 1))
+      } else {
+        setHighlightedIndex((prev) => (prev < options.length - 1 ? prev + 1 : 0))
+      }
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      if (highlightedIndex >= 0 && highlightedIndex < options.length) {
+        handleSelect(options[highlightedIndex].value)
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setIsOpen(false)
+      triggerRef.current?.focus()
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setHighlightedIndex(0)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setHighlightedIndex(options.length - 1)
+    } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      // Typeahead: jump to option starting with typed character
+      const char = e.key.toLowerCase()
+      const startIdx = highlightedIndex + 1
+      let matchIdx = -1
+
+      for (let i = 0; i < options.length; i++) {
+        const checkIdx = (startIdx + i) % options.length
+        const label = String(options[checkIdx].label || '').toLowerCase()
+        if (label.startsWith(char)) {
+          matchIdx = checkIdx
+          break
+        }
+      }
+
+      if (matchIdx >= 0) {
+        e.preventDefault()
+        setHighlightedIndex(matchIdx)
+      }
+    }
+  }
+
+  function handleBlur(e) {
+    if (containerRef.current && !containerRef.current.contains(e.relatedTarget)) {
+      setIsOpen(false)
+    }
   }
 
   // Derive trigger label
@@ -134,12 +239,19 @@ export default function CustomSelect({
       }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
+      onBlur={handleBlur}
     >
       <button
+        ref={triggerRef}
         type="button"
         className={`custom-select-trigger ${isOpen ? 'open' : ''}`}
         onClick={() => setIsOpen((prev) => !prev)}
+        onKeyDown={handleKeyDown}
         style={style}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listboxId}
+        aria-activedescendant={isOpen && highlightedIndex >= 0 ? `${listboxId}-opt-${highlightedIndex}` : undefined}
       >
         <span className="custom-select-label">{renderLabel()}</span>
         <svg
@@ -159,14 +271,26 @@ export default function CustomSelect({
 
       {isOpen && (
         <div className={`custom-select-dropdown ${openUpward ? 'drop-up' : ''}`}>
-          <div className="custom-select-options-list" style={{ maxHeight: dropdownMaxHeight }}>
-            {options.map((opt) => {
+          <div
+            id={listboxId}
+            role="listbox"
+            className="custom-select-options-list"
+            style={{ maxHeight: dropdownMaxHeight }}
+          >
+            {options.map((opt, idx) => {
               const active = isSelected(opt.value)
+              const isHighlighted = highlightedIndex === idx
               return (
                 <div
                   key={opt.value}
-                  className={`custom-select-option ${active ? 'selected' : ''}`}
+                  id={`${listboxId}-opt-${idx}`}
+                  ref={(el) => (optionRefs.current[idx] = el)}
+                  role="option"
+                  aria-selected={active}
+                  className={`custom-select-option ${active ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''}`}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSelect(opt.value)}
+                  onMouseEnter={() => setHighlightedIndex(idx)}
                 >
                   <div className="rowx" style={{ gap: 8, alignItems: 'center' }}>
                     {multiple && (

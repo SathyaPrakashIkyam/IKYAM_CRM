@@ -33,18 +33,20 @@ export default function OnboardingList() {
     loadForms()
   }, [])
 
-  async function loadForms() {
-    setLoading(true)
+  async function loadForms(showLoading = true) {
+    if (showLoading) setLoading(true)
     setError('')
     try {
       const res = await onboardingApi.getAllForms()
       const dataList = Array.isArray(res) ? res : res?.data || res?.items || []
       setForms(dataList)
+      return dataList
     } catch (err) {
       console.error('Failed to load onboarding forms:', err)
       setError('Could not load onboarding requests')
+      return []
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
@@ -55,21 +57,46 @@ export default function OnboardingList() {
     setApprovingId(onboardingId)
     setError('')
     try {
-      await onboardingApi.approveCompanyDetails(onboardingId)
+      const approveRes = await onboardingApi.approveCompanyDetails(onboardingId)
+      const newSchemaId =
+        approveRes?.schema_id ||
+        approveRes?.data?.schema_id ||
+        approveRes?.company?.schema_id ||
+        approveRes?.tenant_schema ||
+        approveRes?.schema
+
+      // Optimistically update status and any returned schema_id immediately
       setForms((prev) =>
         prev.map((item) =>
           (item.onboard_company_id === onboardingId || item.id === onboardingId)
-            ? { ...item, is_approved: true, is_active: true }
+            ? {
+                ...item,
+                is_approved: true,
+                is_active: true,
+                ...(newSchemaId ? { schema_id: newSchemaId } : {}),
+              }
             : item
         )
       )
+
+      // Re-fetch all onboarding forms so backend-provisioned schema_id and tenant data are synced
+      const latestForms = await loadForms(false)
+      const updatedItem = latestForms?.find(
+        (f) => (f.onboard_company_id === onboardingId || f.id === onboardingId)
+      ) || {
+        ...record,
+        is_approved: true,
+        is_active: true,
+        ...(newSchemaId ? { schema_id: newSchemaId } : {}),
+      }
+
       setConfirmRecord(null)
       setModalState({
         open: true,
         title: 'Approval Successful',
         message: `Company "${record.company_name || onboardingId}" has been successfully approved and activated.`,
         type: 'success',
-        record: null,
+        record: updatedItem,
       })
     } catch (err) {
       console.error('Failed to approve onboarding record:', err)
@@ -160,7 +187,7 @@ export default function OnboardingList() {
               }}
             />
           </div>
-          <button className="btn" onClick={loadForms} disabled={loading || !!approvingId}>
+          <button className="btn" onClick={() => loadForms()} disabled={loading || !!approvingId}>
             ⟲ Refresh
           </button>
         </div>
@@ -609,7 +636,20 @@ export default function OnboardingList() {
             </p>
 
             <div className="rowx" style={{ justifyContent: 'flex-end', gap: 10 }}>
-              {modalState.record && (
+              {modalState.type === 'success' && modalState.record?.schema_id && (
+                <button
+                  type="button"
+                  className="btn pri"
+                  onClick={() => {
+                    const rec = modalState.record
+                    setModalState((m) => ({ ...m, open: false }))
+                    setAiKeyRecord(rec)
+                  }}
+                >
+                  🔑 Configure AI Key
+                </button>
+              )}
+              {modalState.type === 'error' && modalState.record && (
                 <button
                   type="button"
                   className="btn pri"

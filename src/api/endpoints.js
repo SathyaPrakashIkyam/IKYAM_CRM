@@ -138,6 +138,7 @@ export const priceListsApi = {
     api.get(`/price-lists/${priceListId}/items/by-sku/${encodeURIComponent(sku)}`).then((r) => r.data),
   setItem: (priceListId, body) => api.post(`/price-lists/${priceListId}/items`, body).then((r) => r.data),
   removeItem: (priceListId, productId) => api.delete(`/price-lists/${priceListId}/items/${productId}`),
+  remove: (priceListId) => api.delete(`/price-lists/${priceListId}`),
 }
 
 export const activitiesApi = {

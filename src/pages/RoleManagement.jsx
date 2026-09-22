@@ -18,6 +18,13 @@ const ACTION_LABELS = {
 // backend ever supports e.g. Export, that column never renders at all.
 const ACTION_ORDER = ['view', 'create', 'edit', 'delete', 'approve', 'export', 'import']
 
+const DEFAULT_PRICE_LISTS_MODULE = {
+  module_code: 'PRICE_LISTS',
+  module_name: 'Price Lists',
+  description: 'Manage price books, currencies, product pricing and tiered rates',
+  actions: ['view', 'create', 'edit', 'delete'],
+}
+
 // Mirrors backend roles/role_modules.py's COMPANY_ADMIN_LOCKED_MODULES —
 // the server re-applies this floor on every save regardless of what gets
 // submitted, so these render as permanently on rather than let an admin
@@ -44,7 +51,32 @@ export default function RoleManagement() {
         selectRole(list[0])
       }
     })
-    rolesApi.modules().then(setModules)
+    rolesApi
+      .modules()
+      .then((mods) => {
+        const list = Array.isArray(mods) ? [...mods] : []
+        const existingIdx = list.findIndex((m) => m.module_code === 'PRICE_LISTS')
+        if (existingIdx === -1) {
+          const prodIdx = list.findIndex((m) => m.module_code === 'PRODUCTS')
+          if (prodIdx !== -1) {
+            list.splice(prodIdx + 1, 0, DEFAULT_PRICE_LISTS_MODULE)
+          } else {
+            list.push(DEFAULT_PRICE_LISTS_MODULE)
+          }
+        } else {
+          const curActions = list[existingIdx].actions || []
+          const requiredActions = ['view', 'create', 'edit', 'delete']
+          const mergedActions = Array.from(new Set([...curActions, ...requiredActions]))
+          list[existingIdx] = {
+            ...list[existingIdx],
+            actions: mergedActions,
+          }
+        }
+        setModules(list)
+      })
+      .catch(() => {
+        setModules([DEFAULT_PRICE_LISTS_MODULE])
+      })
   }
 
   useEffect(load, [])
@@ -166,13 +198,13 @@ export default function RoleManagement() {
               </div>
             </div>
 
-            <div className="rowx sp" style={{ margin: '14px 0 10px' }}>
+            <div className="rowx sp" style={{ margin: '14px 0 10px', flexShrink: 0 }}>
               <span className="tiny">All Roles <b className="chip">{roles.length}</b></span>
               <button className="btn pri" style={{ padding: '6px 12px' }} onClick={() => setShowNewRole((v) => !v)}>＋ Create New Role</button>
             </div>
 
             {showNewRole && (
-              <form className="rowx" style={{ marginBottom: 10, gap: 6 }} onSubmit={createRole}>
+              <form className="rowx" style={{ marginBottom: 10, gap: 6, flexShrink: 0 }} onSubmit={createRole}>
                 <input value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="New role name…" style={roleInput} />
                 <button className="btn pri" style={{ padding: '6px 11px' }}>Save</button>
               </form>
@@ -182,7 +214,7 @@ export default function RoleManagement() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search roles…"
-              style={{ ...roleInput, width: '100%', marginBottom: 10 }}
+              style={{ ...roleInput, width: '100%', marginBottom: 10, flexShrink: 0 }}
             />
 
             <div className="role-mgmt-list">
@@ -216,7 +248,7 @@ export default function RoleManagement() {
               <div className="tiny" style={{ padding: 20 }}>Select a role to configure its permissions.</div>
             ) : (
               <>
-                <div className="rowx sp" style={{ flexWrap: 'wrap', gap: 10 }}>
+                <div className="rowx sp" style={{ flexWrap: 'wrap', gap: 10, flexShrink: 0 }}>
                   <div className="rowx" style={{ gap: 10 }}>
                     <div className="role-mgmt-icon">🛡</div>
                     <div>
@@ -235,16 +267,16 @@ export default function RoleManagement() {
                 </div>
 
                 {isCompanyAdminRole && (
-                  <div className="tiny" style={{ marginTop: 8, color: 'var(--mut)' }}>
+                  <div className="tiny" style={{ marginTop: 8, color: 'var(--mut)', flexShrink: 0 }}>
                     🔒 Products, User Management, Settings and Role Management stay permanently on for Company
                     Admin — they can't be revoked, so an admin can never get locked out of the app.
                   </div>
                 )}
                 {saveError && (
-                  <div className="tiny" style={{ marginTop: 8, color: 'var(--orange-ink)' }}>⚠ {saveError}</div>
+                  <div className="tiny" style={{ marginTop: 8, color: 'var(--orange-ink)', flexShrink: 0 }}>⚠ {saveError}</div>
                 )}
                 {saveOk && (
-                  <div className="tiny" style={{ marginTop: 8, color: 'var(--green-ink)' }}>✓ Saved</div>
+                  <div className="tiny" style={{ marginTop: 8, color: 'var(--green-ink)', flexShrink: 0 }}>✓ Saved</div>
                 )}
 
                 <div className="role-mgmt-table-wrap">

@@ -148,6 +148,13 @@
   color: #FFFFFF;
 }
 
+.user-form-custom-select .custom-select-trigger:focus-visible,
+.user-form-custom-select .custom-select-trigger.open {
+  border-color: #00C9A7;
+  box-shadow: 0 0 0 3.5px rgba(0, 201, 167, 0.16);
+  outline: none;
+}
+
 .userform-actions {
   display: flex;
   align-items: center;

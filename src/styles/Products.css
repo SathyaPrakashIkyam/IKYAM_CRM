@@ -415,6 +415,12 @@
   color: #FFFFFF;
 }
 
+.products-modal-input.error,
+.products-modal-custom-select.error .custom-select-trigger {
+  border-color: #ec6969 !important;
+  box-shadow: 0 0 0 3px rgba(236, 105, 105, 0.25) !important;
+}
+
 .products-source-toggle {
   display: flex;
   align-items: center;

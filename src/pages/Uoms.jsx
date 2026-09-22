@@ -118,6 +118,13 @@ export default function Uoms() {
           >
             💱 Currencies
           </button>
+          <button
+            type="button"
+            className="actchip"
+            onClick={() => navigate('/price-lists')}
+          >
+            💰 Price Lists
+          </button>
         </div>
 
         {/* Metrics Strip */}
