@@ -515,11 +515,11 @@ export default function Leads() {
                     <label className="lead-modal-label">Lead source *</label>
                     <CustomSelect
                       options={[
-                        { value: 'manual', label: 'Manual entry' },
-                        { value: 'web', label: 'Website inquiry' },
-                        { value: 'referral', label: 'Customer referral' },
-                        { value: 'event', label: 'Event / Trade show' },
-                        { value: 'partner', label: 'Partner channel' },
+                        { value: 'manual', label: 'Manual Entry' },
+                        { value: 'web', label: 'Website Inquiry' },
+                        { value: 'referral', label: 'Customer Referral' },
+                        { value: 'event', label: 'Event / Trade Show' },
+                        { value: 'partner', label: 'Partner Channel' },
                         { value: 'other', label: 'Other' },
                       ]}
                       value={newLead.source}

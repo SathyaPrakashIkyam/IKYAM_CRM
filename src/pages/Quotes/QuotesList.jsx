@@ -8,6 +8,39 @@ import '../../styles/Quotes.css'
 import '../../styles/Products.css'
 import { useAuth } from '../../context/AuthContext'
 
+function getTodayString() {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDateDisplay(dateStr) {
+  if (!dateStr) return '—'
+  try {
+    const clean = String(dateStr).split('T')[0].trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+      return clean
+    }
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch {
+    return dateStr
+  }
+}
+
+function isExpired(dateStr) {
+  if (!dateStr) return false
+  const clean = String(dateStr).split('T')[0]
+  const today = getTodayString()
+  return clean < today
+}
+
 function formatINR(val) {
   return Number(val || 0).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
@@ -67,6 +100,10 @@ export default function QuotesList() {
       return (
         (q.doc_num || '').toLowerCase().includes(s) ||
         (q.account_name || '').toLowerCase().includes(s) ||
+        (q.quote_date || '').toLowerCase().includes(s) ||
+        (q.valid_until || '').toLowerCase().includes(s) ||
+        formatDateDisplay(q.quote_date).toLowerCase().includes(s) ||
+        formatDateDisplay(q.valid_until).toLowerCase().includes(s) ||
         (q.status || '').toLowerCase().includes(s) ||
         (q.erp_sync_status || '').toLowerCase().includes(s) ||
         (q.quote_type || '').toLowerCase().includes(s) ||
@@ -231,6 +268,7 @@ export default function QuotesList() {
               <tr>
                 <th>Doc #</th>
                 <th>Account</th>
+                <th>Quote Date</th>
                 <th>Quote Type</th>
                 <th>Status</th>
                 <th className="num">Subtotal ₹</th>
@@ -270,6 +308,12 @@ export default function QuotesList() {
                   <td>
                     <b>{q.account_name || '—'}</b>
                   </td>
+                  <td>
+                    <span className="mono" style={{ fontSize: 12.5 }}>
+                      {formatDateDisplay(q.quote_date || q.created_at)}
+                    </span>
+                  </td>
+                  
                   <td>
                     {q.quote_type === 'sap_b1' ? (
                       <span className="quote-chip sap">
@@ -323,7 +367,7 @@ export default function QuotesList() {
               ))}
               {filteredQuotes.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: 36 }}>
+                  <td colSpan={11} style={{ textAlign: 'center', padding: 36 }}>
                     {loading ? (
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: 'var(--mut)' }}>
                         <span className="quote-spinner" style={{ width: 18, height: 18 }} />

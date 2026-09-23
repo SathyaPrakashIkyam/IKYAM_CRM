@@ -2,11 +2,38 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../../components/AppShell'
 import CustomSelect from '../../components/CustomSelect'
+import DateInput from '../../components/DateInput'
 import { accountsApi, quotesApi, productsApi, priceListsApi, productGroupsApi } from '../../api/endpoints'
 import '../../styles/ikyam-mock.css'
 import '../../styles/Quotes.css'
 import '../../styles/Products.css'
 import { useAuth } from '../../context/AuthContext'
+
+function getTodayString() {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDateDisplay(dateStr) {
+  if (!dateStr) return '—'
+  try {
+    const clean = String(dateStr).split('T')[0].trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+      return clean
+    }
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch {
+    return dateStr
+  }
+}
 
 const EMPTY_LINE = {
   description: '',
@@ -18,7 +45,12 @@ const EMPTY_LINE = {
   product_id: null,
   sku: '',
 }
-const EMPTY_FORM = { account_id: '', lines: [{ ...EMPTY_LINE }] }
+const EMPTY_FORM = {
+  account_id: '',
+  quote_date: getTodayString(),
+  valid_until: '',
+  lines: [{ ...EMPTY_LINE }],
+}
 const HIGH_DISCOUNT_THRESHOLD = 15
 
 function formatINR(val) {
@@ -519,6 +551,9 @@ export default function NewQuotes() {
     if (!selectedPriceListId) {
       errors.price_list = 'Please select a price list.'
     }
+    if (form.valid_until && form.quote_date && form.valid_until < form.quote_date) {
+      errors.valid_until = 'Valid until date cannot be earlier than quote date.'
+    }
     const validLines = form.lines.filter((l) => l.description && l.description.trim())
     if (validLines.length === 0) {
       errors.lines = 'Please add at least one line item with a product description.'
@@ -554,6 +589,8 @@ export default function NewQuotes() {
       setSubmitting(true)
       await quotesApi.create(companyId, {
         ...form,
+        quote_date: form.quote_date || getTodayString(),
+        valid_until: form.valid_until || null,
         price_list_id: selectedPriceListId || undefined,
         lines,
       })
@@ -659,6 +696,7 @@ export default function NewQuotes() {
             {/* Form Validation Error Banner */}
             {(formErrors.account_id ||
               formErrors.price_list ||
+              formErrors.valid_until ||
               formErrors.lines ||
               formErrors.submit) && (
               <div className="quotes-form-error-banner">
@@ -667,6 +705,7 @@ export default function NewQuotes() {
                   {formErrors.submit ||
                     formErrors.account_id ||
                     formErrors.price_list ||
+                    formErrors.valid_until ||
                     formErrors.lines}
                 </span>
               </div>
@@ -743,7 +782,7 @@ export default function NewQuotes() {
                 )}
               </div>
 
-              <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ flex: 1.2, minWidth: 200 }}>
                 <div className="rowx sp" style={{ marginBottom: 4, alignItems: 'center' }}>
                   <span className="tiny mut font-semibold">
                     PRICE LIST <span style={{ color: '#EF4444' }}>*</span>
@@ -769,6 +808,48 @@ export default function NewQuotes() {
                 {formErrors.price_list && (
                   <span className="tiny" style={{ color: '#EF4444', marginTop: 4, display: 'block', fontWeight: 600 }}>
                     {formErrors.price_list}
+                  </span>
+                )}
+              </div>
+
+              {/* Quote Date Selector */}
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <div className="rowx sp" style={{ marginBottom: 4, alignItems: 'center' }}>
+                  <span className="tiny mut font-semibold">
+                    QUOTE DATE
+                  </span>
+                </div>
+                <DateInput
+                  value={form.quote_date}
+                  onChange={(val) => setForm((prev) => ({ ...prev, quote_date: val }))}
+                  disabled={submitting}
+                />
+              </div>
+
+              {/* Valid Until Date Selector */}
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <div className="rowx sp" style={{ marginBottom: 4, alignItems: 'center' }}>
+                  <span className="tiny mut font-semibold">
+                    VALID UNTIL
+                  </span>
+                </div>
+                <DateInput
+                  value={form.valid_until}
+                  min={form.quote_date}
+                  hasError={Boolean(formErrors.valid_until)}
+                  clearable={true}
+                  placeholder="YYYY-MM-DD"
+                  onChange={(val) => {
+                    setForm((prev) => ({ ...prev, valid_until: val }))
+                    if (formErrors.valid_until) {
+                      setFormErrors((prev) => ({ ...prev, valid_until: null }))
+                    }
+                  }}
+                  disabled={submitting}
+                />
+                {formErrors.valid_until && (
+                  <span className="tiny" style={{ color: '#EF4444', marginTop: 4, display: 'block', fontWeight: 600 }}>
+                    {formErrors.valid_until}
                   </span>
                 )}
               </div>

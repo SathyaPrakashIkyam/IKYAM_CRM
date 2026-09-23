@@ -105,7 +105,8 @@
   border-radius: 18px;
   border: 1.5px solid var(--line, #EFE4D6);
   background: var(--surface, #FFFFFF);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
@@ -1120,5 +1121,215 @@
   color: #0072CE;
   font: 600 11.5px var(--b, sans-serif);
   animation: quoteFadeIn 0.15s ease;
+}
+
+/* Quote Date & Valid Until Themed Picker Wrapper (Guarantees YYYY-MM-DD display) */
+.quotes-date-picker-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line, #EFE4D6);
+  background: var(--surface, #FFFFFF);
+  padding: 0 14px;
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.quotes-date-picker-wrap:hover:not(.disabled) {
+  border-color: #00C9A7;
+}
+
+.quotes-date-picker-wrap:focus-within:not(.disabled) {
+  border-color: #00C9A7;
+  box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.18);
+}
+
+.quotes-date-picker-wrap.has-error {
+  border-color: #EF4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+  background: rgba(239, 68, 68, 0.02);
+}
+
+.quotes-date-picker-wrap.disabled {
+  background: var(--surface2, #F8FAFC);
+  border-color: var(--line, #EFE4D6);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.quotes-date-display-val {
+  flex: 1;
+  font: 600 13px var(--b, system-ui, sans-serif);
+  color: var(--ink, #192A32);
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quotes-date-display-val.placeholder {
+  color: var(--mut, #8899A6);
+  font-weight: 500;
+}
+
+.quotes-date-calendar-icon {
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.quotes-date-picker-wrap:hover:not(.disabled) .quotes-date-calendar-icon {
+  color: #00C9A7 !important;
+}
+
+.quotes-date-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--mut, #64748B);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  margin-right: 4px;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.quotes-date-clear-btn:hover {
+  color: #EF4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.quotes-hidden-date-picker {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  z-index: -1;
+}
+
+[data-theme="dark"] .quotes-date-picker-wrap {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme="dark"] .quotes-date-picker-wrap:hover {
+  border-color: #00C9A7;
+}
+
+[data-theme="dark"] .quotes-date-picker-wrap:focus-within {
+  border-color: #00C9A7;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+[data-theme="dark"] .quotes-date-picker-wrap.disabled {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .quotes-date-display-val {
+  color: var(--ink, #F1F5F9);
+}
+
+[data-theme="dark"] .quotes-date-display-val.placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Quote Date & Valid Until Inputs */
+.quotes-date-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line, #EFE4D6);
+  background: var(--surface, #FFFFFF);
+  color: var(--ink, #192A32);
+  font: 500 13px var(--b, system-ui, sans-serif);
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.quotes-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
+.quotes-date-input:hover {
+  border-color: #00C9A7;
+}
+
+.quotes-date-input:focus {
+  border-color: #00C9A7;
+  box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.18);
+  background: var(--surface, #FFFFFF);
+}
+
+.quotes-date-input.has-error {
+  border-color: #EF4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+  background: rgba(239, 68, 68, 0.02);
+}
+
+.quotes-date-input:disabled {
+  background: var(--surface2, #F8FAFC);
+  color: var(--mut, #64748B);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+[data-theme="dark"] .quotes-date-input {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--ink, #F1F5F9);
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .quotes-date-input:hover {
+  border-color: #00C9A7;
+}
+
+[data-theme="dark"] .quotes-date-input:focus {
+  border-color: #00C9A7;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+[data-theme="dark"] .quotes-date-input:disabled {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Expired Status Badge */
+.quote-expired-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 700 10.5px var(--b, sans-serif);
+  padding: 1.5px 6px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  letter-spacing: 0.2px;
+}
+
+[data-theme="dark"] .quote-expired-badge {
+  background: rgba(239, 68, 68, 0.18);
+  color: #F87171;
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
