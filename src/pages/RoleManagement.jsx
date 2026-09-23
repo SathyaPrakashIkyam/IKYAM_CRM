@@ -18,12 +18,32 @@ const ACTION_LABELS = {
 // backend ever supports e.g. Export, that column never renders at all.
 const ACTION_ORDER = ['view', 'create', 'edit', 'delete', 'approve', 'export', 'import']
 
+const DEFAULT_UOMS_MODULE = {
+  module_code: 'UOMS',
+  module_name: 'UOM Master',
+  description: 'Manage units of measure for products and inventory',
+  actions: ['view', 'create', 'edit', 'delete'],
+}
+
+const DEFAULT_CURRENCIES_MODULE = {
+  module_code: 'CURRENCIES',
+  module_name: 'Currencies Master',
+  description: 'Manage multi-currency rates, currency codes and conversions',
+  actions: ['view', 'create', 'edit', 'delete'],
+}
+
 const DEFAULT_PRICE_LISTS_MODULE = {
   module_code: 'PRICE_LISTS',
-  module_name: 'Price Lists',
+  module_name: 'Price Lists Master',
   description: 'Manage price books, currencies, product pricing and tiered rates',
   actions: ['view', 'create', 'edit', 'delete'],
 }
+
+const EXTRA_MASTER_MODULES = [
+  DEFAULT_UOMS_MODULE,
+  DEFAULT_CURRENCIES_MODULE,
+  DEFAULT_PRICE_LISTS_MODULE,
+]
 
 // Mirrors backend roles/role_modules.py's COMPANY_ADMIN_LOCKED_MODULES —
 // the server re-applies this floor on every save regardless of what gets
@@ -55,27 +75,33 @@ export default function RoleManagement() {
       .modules()
       .then((mods) => {
         const list = Array.isArray(mods) ? [...mods] : []
-        const existingIdx = list.findIndex((m) => m.module_code === 'PRICE_LISTS')
-        if (existingIdx === -1) {
-          const prodIdx = list.findIndex((m) => m.module_code === 'PRODUCTS')
-          if (prodIdx !== -1) {
-            list.splice(prodIdx + 1, 0, DEFAULT_PRICE_LISTS_MODULE)
+        let insertOffset = 1
+        const prodIdx = list.findIndex((m) => m.module_code === 'PRODUCTS')
+
+        EXTRA_MASTER_MODULES.forEach((extraMod) => {
+          const existingIdx = list.findIndex((m) => m.module_code === extraMod.module_code)
+          if (existingIdx === -1) {
+            if (prodIdx !== -1) {
+              list.splice(prodIdx + insertOffset, 0, extraMod)
+              insertOffset++
+            } else {
+              list.push(extraMod)
+            }
           } else {
-            list.push(DEFAULT_PRICE_LISTS_MODULE)
+            const curActions = list[existingIdx].actions || []
+            const mergedActions = Array.from(new Set([...curActions, ...extraMod.actions]))
+            list[existingIdx] = {
+              ...extraMod,
+              ...list[existingIdx],
+              module_name: extraMod.module_name,
+              actions: mergedActions,
+            }
           }
-        } else {
-          const curActions = list[existingIdx].actions || []
-          const requiredActions = ['view', 'create', 'edit', 'delete']
-          const mergedActions = Array.from(new Set([...curActions, ...requiredActions]))
-          list[existingIdx] = {
-            ...list[existingIdx],
-            actions: mergedActions,
-          }
-        }
+        })
         setModules(list)
       })
       .catch(() => {
-        setModules([DEFAULT_PRICE_LISTS_MODULE])
+        setModules(EXTRA_MASTER_MODULES)
       })
   }
 

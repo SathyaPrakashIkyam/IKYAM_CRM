@@ -231,6 +231,12 @@ export default function Users() {
                         <span className="chip brand" style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>
                           {u.role || '—'}
                         </span>
+                        {u.sales_manager_name && (
+                          <div className="tiny mut" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span>👔</span>
+                            <span>Mgr: <b>{u.sales_manager_name}</b></span>
+                          </div>
+                        )}
                       </td>
                       <td>
                         <div className="tiny mut">{u.city ? `${u.city}${u.country ? `, ${u.country}` : ''}` : u.location || '—'}</div>

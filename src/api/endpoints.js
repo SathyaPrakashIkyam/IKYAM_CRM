@@ -46,6 +46,15 @@ export const userMasterApi = {
     api
       .get('/user_master/get_all_users', { params: { schema_id: schemaId || '' } })
       .then((r) => r.data),
+  getSalesManagers: (companyId, schemaId) =>
+    api
+      .get('/user_master/get_sales_managers', {
+        params: {
+          ...(companyId ? { company_id: companyId } : {}),
+          ...(schemaId ? { schema_id: schemaId } : {}),
+        },
+      })
+      .then((r) => r.data),
   addUserMaster: (body) => api.post('/user_master/add-usermaster', body).then((r) => r.data),
   updateUserMaster: (userId, body) =>
     api.patch(`/user_master/update_user/${userId}`, body).then((r) => r.data),

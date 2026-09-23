@@ -2,12 +2,16 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { currenciesApi } from '../api/endpoints'
+import { useAuth } from '../context/AuthContext'
 import '../styles/ikyam-mock.css'
 import '../styles/Activities.css'
 import '../styles/Masters.css'
 
 export default function Currencies() {
   const navigate = useNavigate()
+  const { isCompanyAdmin, isSuperAdmin, can } = useAuth()
+  const canView = isCompanyAdmin || isSuperAdmin || can('CURRENCIES', 'view')
+  const canCreate = isCompanyAdmin || isSuperAdmin || can('CURRENCIES', 'create')
   const [currencies, setCurrencies] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -76,6 +80,23 @@ export default function Currencies() {
     })
   }, [currencies, search])
 
+  if (!canView) {
+    return (
+      <AppShell>
+        <div className="ikyam-mock masters-page" style={{ padding: 48, textAlign: 'center' }}>
+          <div style={{ fontSize: 56, marginBottom: 14 }}>🔒</div>
+          <h2 style={{ font: '800 22px var(--d)', color: 'var(--ink)' }}>Access Restricted</h2>
+          <p className="tiny mut" style={{ maxWidth: 440, margin: '10px auto 22px', fontSize: 13, lineHeight: 1.5 }}>
+            You do not have permission to view Currencies. Please contact your company administrator to grant you the <b>CURRENCIES</b> View permission.
+          </p>
+          <button className="btn pri" style={{ padding: '8px 24px', borderRadius: 20 }} onClick={() => navigate('/today')}>
+            Go to Home
+          </button>
+        </div>
+      </AppShell>
+    )
+  }
+
   return (
     <AppShell>
       <div className="ikyam-mock masters-page">
@@ -142,7 +163,7 @@ export default function Currencies() {
           <div className="masters-metric-col">
             <span className="masters-metric-label">Access Level</span>
             <span className="masters-metric-num" style={{ fontSize: 14, marginTop: 7, color: 'var(--mut)' }}>
-              🔒 Company Admin Master
+              {isCompanyAdmin || isSuperAdmin ? '🛡 Admin Master' : '👤 Role Gated'}
             </span>
           </div>
         </div>
@@ -170,7 +191,8 @@ export default function Currencies() {
               </span>
             )}
           </div>
-  <button
+          {canCreate && (
+            <button
               className="btn pri"
               style={{
                 borderRadius: 24,
@@ -189,7 +211,7 @@ export default function Currencies() {
             >
               ＋ New currency
             </button>
-
+          )}
         </div>
 
         {error && (

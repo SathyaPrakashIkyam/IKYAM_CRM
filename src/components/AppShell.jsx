@@ -42,8 +42,8 @@ const ALL_NAV_ITEMS = [
     adminOnly: false,
     children: [
       { to: '/product-groups', label: 'Product Groups', icon: '📁' },
-      { to: '/uoms', label: 'Units of Measure', icon: '📏' },
-      { to: '/currencies', label: 'Currencies', icon: '💱' },
+      { to: '/uoms', label: 'Units of Measure', icon: '📏', module: 'UOMS' },
+      { to: '/currencies', label: 'Currencies', icon: '💱', module: 'CURRENCIES' },
       { to: '/price-lists', label: 'Price Lists', icon: '💰', module: 'PRICE_LISTS' },
       { to: '/products', label: 'Products', icon: '▧', module: 'PRODUCTS' },
     ],
@@ -87,7 +87,7 @@ export default function AppShell({ children, aiPanel }) {
     isAdminLike ||
     can('MASTERS', 'view') ||
     can('MASTER', 'view') ||
-    can('PRODUCT_GROUPS', 'view') ||
+    can('PRODUCTS', 'view') ||
     can('UOMS', 'view') ||
     can('CURRENCIES', 'view') ||
     can('PRICE_LISTS', 'view')

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
@@ -24,8 +24,14 @@ const STATUS_OPTIONS = [
   { value: false, label: '🔴 Inactive' },
 ]
 
+function isSalesEmployee(role) {
+  if (!role) return false
+  const clean = String(role).trim().toLowerCase().replace(/[\s_-]+/g, '')
+  return clean === 'salesemployee' || clean === 'salesperson' || clean === 'salesrep'
+}
+
 export default function UserForm() {
-  const { auth } = useAuth()
+  const { auth, companyId } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -38,12 +44,42 @@ export default function UserForm() {
     rolesApi.list().then(setRoles).catch(() => {})
   }, [])
 
+  const [salesManagers, setSalesManagers] = useState([])
+  const [loadingManagers, setLoadingManagers] = useState(false)
+
+  useEffect(() => {
+    setLoadingManagers(true)
+    userMasterApi
+      .getSalesManagers(companyId || auth?.schema_id)
+      .then((res) => {
+        let list = []
+        if (Array.isArray(res)) {
+          list = res
+        } else if (Array.isArray(res?.data)) {
+          list = res.data
+        } else if (Array.isArray(res?.sales_managers)) {
+          list = res.sales_managers
+        } else if (Array.isArray(res?.items)) {
+          list = res.items
+        } else if (Array.isArray(res?.managers)) {
+          list = res.managers
+        }
+        setSalesManagers(list)
+      })
+      .catch((err) => {
+        console.error('Failed to load sales managers:', err)
+      })
+      .finally(() => setLoadingManagers(false))
+  }, [companyId, auth?.schema_id])
+
   const [form, setForm] = useState({
     user_id: `USER_${Math.floor(1000 + Math.random() * 9000)}`,
     user_name: '',
     password: '',
     is_active: true,
     role: '',
+    sales_manager_id: '',
+    sales_manager_name: '',
     email: '',
     token: '',
     schema_id: auth?.schema_id || 'ik_crmb1_c00002',
@@ -71,6 +107,8 @@ export default function UserForm() {
         password: rec.password || '',
         is_active: rec.is_active ?? true,
         role: rec.role || 'COMPANY_ADMIN',
+        sales_manager_id: rec.sales_manager_id != null ? rec.sales_manager_id : '',
+        sales_manager_name: rec.sales_manager_name || '',
         email: rec.email || '',
         token: rec.token || '',
         schema_id: rec.schema_id || auth?.schema_id || 'ik_crmb1_c00002',
@@ -85,10 +123,46 @@ export default function UserForm() {
     }
   }, [location.state, auth?.schema_id])
 
+  const salesManagerOptions = useMemo(() => {
+    const opts = salesManagers.map((m) => {
+      const rawId = m.sales_manager_id ?? m.user_id ?? m.id
+      const idStr = String(rawId ?? '')
+      const name = m.sales_manager_name || m.user_name || m.name || m.full_name || idStr
+      return {
+        value: idStr,
+        label: name !== idStr ? `${name} (${idStr})` : name,
+        rawName: name,
+        rawId: rawId,
+      }
+    })
+
+    if (form.sales_manager_id && !opts.some((o) => o.value === String(form.sales_manager_id))) {
+      opts.unshift({
+        value: String(form.sales_manager_id),
+        label: form.sales_manager_name
+          ? `${form.sales_manager_name} (${form.sales_manager_id})`
+          : String(form.sales_manager_id),
+        rawName: form.sales_manager_name || String(form.sales_manager_id),
+        rawId: form.sales_manager_id,
+      })
+    }
+
+    return [{ value: '', label: loadingManagers ? 'Loading sales managers…' : 'Select a Sales Manager *' }, ...opts]
+  }, [salesManagers, loadingManagers, form.sales_manager_id, form.sales_manager_name])
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setSuccess('')
+
+    // Validate Sales Manager mapping for Sales Employee
+    if (isSalesEmployee(form.role)) {
+      if (!form.sales_manager_id || !form.sales_manager_name) {
+        setError('Sales Manager (ID & Name) is mandatory when Security Role is Sales Employee.')
+        return
+      }
+    }
+
     setSaving(true)
 
     const payload = {
@@ -108,6 +182,8 @@ export default function UserForm() {
       street_name: form.street_name || '',
       zipcode: form.zipcode || '',
       city: form.city || '',
+      sales_manager_id: form.sales_manager_id || undefined,
+      sales_manager_name: form.sales_manager_name || undefined,
     }
 
     try {
@@ -203,13 +279,74 @@ export default function UserForm() {
                     <CustomSelect
                       options={roleOptions}
                       value={form.role}
-                      onChange={(val) => setForm({ ...form, role: val })}
+                      onChange={(val) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          role: val,
+                          ...(!isSalesEmployee(val) ? { sales_manager_id: '', sales_manager_name: '' } : {}),
+                        }))
+                      }
                       className="user-form-custom-select"
                       placeholder="Select a role…"
                     />
                   </div>
                 </div>
               </div>
+
+              {/* Conditional Sales Manager Mapping for Sales Employee */}
+              {isSalesEmployee(form.role) && (
+                <div
+                  className="userform-grid-2"
+                  style={{
+                    marginBottom: 16,
+                    padding: '16px 18px',
+                    borderRadius: 16,
+                    background: 'linear-gradient(135deg, rgba(0, 201, 167, 0.08) 0%, rgba(0, 114, 206, 0.05) 100%)',
+                    border: '1.5px solid rgba(0, 201, 167, 0.28)',
+                  }}
+                >
+                  <div className="userform-field">
+                    <label className="userform-label">
+                      Sales Manager * <span style={{ color: '#00C9A7', fontWeight: 600, fontSize: 11 }}>(Required for Sales Employee)</span>
+                    </label>
+                    <div className="userform-input-wrapper">
+                      <CustomSelect
+                        options={salesManagerOptions}
+                        value={String(form.sales_manager_id || '')}
+                        onChange={(val) => {
+                          const selected = salesManagerOptions.find((o) => o.value === String(val))
+                          setForm((prev) => ({
+                            ...prev,
+                            sales_manager_id: selected?.rawId != null ? selected.rawId : val,
+                            sales_manager_name: selected?.rawName || '',
+                          }))
+                        }}
+                        className="user-form-custom-select"
+                        placeholder="Select a Sales Manager *"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="userform-field">
+                    <label className="userform-label">Mapped Sales Manager Name</label>
+                    <div className="userform-input-wrapper">
+                      <input
+                        type="text"
+                        readOnly
+                        className="userform-input"
+                        style={{
+                          background: 'var(--surface2)',
+                          cursor: 'default',
+                          color: form.sales_manager_name ? 'var(--ink)' : 'var(--mut)',
+                          fontWeight: form.sales_manager_name ? 600 : 400,
+                        }}
+                        value={form.sales_manager_name || 'No manager selected'}
+                        placeholder="Auto-populated from manager selection"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="userform-grid-2">
                 <div className="userform-field">
