@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { accountsApi, activitiesApi, opportunitiesApi } from '../api/endpoints'
@@ -23,6 +23,8 @@ export default function Record() {
   const [activities, setActivities] = useState([])
   const [activeType, setActiveType] = useState('call')
   const [subject, setSubject] = useState('')
+  const [dueAt, setDueAt] = useState('')
+  const [activityError, setActivityError] = useState('')
   const [newAttachments, setNewAttachments] = useState([])
   const [completeTarget, setCompleteTarget] = useState(null)
   const [completeSummary, setCompleteSummary] = useState('')
@@ -42,6 +44,20 @@ export default function Record() {
   const [closeError, setCloseError] = useState('')
   const navigate = useNavigate()
   const activityInputRef = useRef(null)
+
+  function setQuickDue(offsetDaysOrHours, targetHour = null) {
+    const d = new Date()
+    if (targetHour !== null) {
+      d.setDate(d.getDate() + offsetDaysOrHours)
+      d.setHours(targetHour, 0, 0, 0)
+    } else {
+      d.setHours(d.getHours() + offsetDaysOrHours)
+    }
+    const pad = (n) => String(n).padStart(2, '0')
+    const localIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    setDueAt(localIso)
+    if (activityError) setActivityError('')
+  }
 
   // Both ways an activity gets created for this deal (the Activities page's
   // "Associated Lead" picker, or this page's own "Log an activity" box) now
@@ -95,11 +111,23 @@ export default function Record() {
     // lead (every activity requires one now) — this is just a defensive
     // backstop against a stale render still calling through.
     if (!opp.source_lead_id) return
-    const text = subject.trim() || `${activeType} logged`
+    setActivityError('')
+    const text = subject.trim()
+    if (!text) {
+      setActivityError('Activity description / typing line is mandatory.')
+      activityInputRef.current?.focus()
+      return
+    }
+    if (!dueAt) {
+      setActivityError('Follow-up Date & Time is mandatory.')
+      return
+    }
+
     try {
       const activity = await activitiesApi.create(opp.company_id, {
         activity_type: activeType,
         subject: text,
+        due_at: new Date(dueAt).toISOString(),
         related_object_type: 'opportunity',
         related_record_id: id,
         lead_id: opp.source_lead_id,
@@ -114,12 +142,14 @@ export default function Record() {
       }
 
       setSubject('')
+      setDueAt('')
       setNewAttachments([])
+      setActivityError('')
       loadActivities(opp.source_lead_id)
     } catch (err) {
       const detail = err?.response?.data?.detail
       const msg = typeof detail === 'string' ? detail : (detail?.[0]?.msg || 'Failed to log activity.')
-      alert(msg)
+      setActivityError(msg)
     }
   }
 
@@ -231,6 +261,17 @@ export default function Record() {
     setLostReasonError('')
   }
 
+  const upcomingActivities = useMemo(() => {
+    return activities
+      .filter((a) => a.status === 'open' && a.due_at)
+      .sort((a, b) => new Date(a.due_at) - new Date(b.due_at))
+  }, [activities])
+  const nextFollowUp = upcomingActivities[0] || null
+  const nextFollowUpOverdue = nextFollowUp && new Date(nextFollowUp.due_at) < new Date()
+  const fallbackOpenActivity = useMemo(() => {
+    return activities.find((a) => a.status === 'open') || null
+  }, [activities])
+
   if (!opp) {
     return (
       <AppShell>
@@ -323,31 +364,120 @@ export default function Record() {
               </div>
               <div className="fld"><span className="lab">Amount</span><span className="mono" style={{ fontWeight: 600 }}>{opp.amount ? `₹${opp.amount.toLocaleString('en-IN')}` : '—'}</span></div>
               <div className="fld"><span className="lab">Win probability</span>{probability != null ? `${probability}%` : '—'}</div>
-              <div className="fld" style={{ border: 0 }}><span className="lab">Expected close</span>{opp.expected_close_date || '—'}</div>
+              <div className="fld"><span className="lab">Expected close</span>{opp.expected_close_date || '—'}</div>
+              <div className="fld" style={{ border: 0 }}>
+                <span className="lab">Next follow-up</span>
+                {nextFollowUp ? (
+                  <div style={{ marginTop: 2 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: nextFollowUpOverdue ? 'var(--danger, #d64545)' : 'var(--primary, #00C9A7)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                      <span>{iconFor(nextFollowUp.activity_type)}</span>
+                      <span>{new Date(nextFollowUp.due_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span style={{ fontSize: 11, opacity: 0.85 }}>{new Date(nextFollowUp.due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    {nextFollowUpOverdue && (
+                      <span className="chip warn" style={{ fontSize: 9.5, padding: '1px 5px', marginTop: 3, display: 'inline-block' }}>Overdue</span>
+                    )}
+                  </div>
+                ) : fallbackOpenActivity ? (
+                  <div style={{ fontSize: 11.5, color: 'var(--mut)', marginTop: 2 }}>
+                    {iconFor(fallbackOpenActivity.activity_type)} {fallbackOpenActivity.subject || 'Open activity'} (no date)
+                  </div>
+                ) : (
+                  <span className="tiny mut">—</span>
+                )}
+              </div>
             </div>
 
             <div className="mid">
               {opp.source_lead_id ? (
-                <div className="card" style={{ padding: '10px 12px' }}>
-                  <span className="tiny">Log an activity</span>
-                  <div className="rowx" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+                <div className="card" style={{ padding: '12px 14px' }}>
+                  <div className="rowx sp">
+                    <span className="tiny" style={{ fontWeight: 700 }}>Log / Schedule Activity</span>
+                    <span className="tiny mut" style={{ fontSize: 11 }}>Next Follow-up</span>
+                  </div>
+
+                  {/* Activity Type Chips */}
+                  <div className="rowx" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
                     {ACTIVITY_TYPES.map((t) => (
-                      <span key={t.type} className={`chip actchip ${activeType === t.type ? 'on' : ''}`} onClick={() => setActiveType(t.type)}>
+                      <span
+                        key={t.type}
+                        className={`chip actchip ${activeType === t.type ? 'on' : ''}`}
+                        onClick={() => setActiveType(t.type)}
+                      >
                         {t.label}
                       </span>
                     ))}
                   </div>
-                  <input
-                    ref={activityInputRef}
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="What happened?"
-                    className="record-activity-input"
-                  />
+
+                  {/* Subject Input */}
+                  <div style={{ marginTop: 8 }}>
+                    <div className="rowx sp" style={{ marginBottom: 4 }}>
+                      <label className="tiny" style={{ fontWeight: 700, color: 'var(--ink)' }}>
+                        Description / Next Steps *
+                      </label>
+                      <span className="tiny" style={{ color: 'var(--danger, #d64545)', fontWeight: 600, fontSize: 10.5 }}>
+                        Mandatory
+                      </span>
+                    </div>
+                    <input
+                      ref={activityInputRef}
+                      required
+                      value={subject}
+                      onChange={(e) => {
+                        setSubject(e.target.value)
+                        if (activityError) setActivityError('')
+                      }}
+                      placeholder={`Enter what happened or what's planned for this ${activeType}... *`}
+                      className="record-activity-input"
+                      style={{ marginTop: 0 }}
+                    />
+                  </div>
+
+                  {/* Next Follow-up Date & Time Picker */}
+                  <div style={{ marginTop: 10, background: 'rgba(0, 201, 167, 0.04)', border: '1.5px solid rgba(0, 201, 167, 0.25)', borderRadius: 12, padding: '10px 12px' }}>
+                    <div className="rowx sp" style={{ marginBottom: 6 }}>
+                      <label className="tiny" style={{ fontWeight: 700, color: 'var(--ink)' }}>
+                        📅 Follow-up Date &amp; Time *
+                      </label>
+                      <span className="tiny" style={{ color: 'var(--danger, #d64545)', fontWeight: 600, fontSize: 10.5 }}>
+                        Mandatory
+                      </span>
+                    </div>
+                    
+                    <input
+                      type="datetime-local"
+                      required
+                      value={dueAt}
+                      onChange={(e) => {
+                        setDueAt(e.target.value)
+                        if (activityError) setActivityError('')
+                      }}
+                      className="record-activity-datetime-input"
+                    />
+
+                    {/* Quick Preset Buttons */}
+                    <div className="rowx" style={{ marginTop: 6, gap: 5, flexWrap: 'wrap' }}>
+                      <span className="tiny mut" style={{ fontSize: 10.5 }}>Quick:</span>
+                      <button type="button" className="btn ghost" style={{ padding: '2px 7px', fontSize: 10.5, borderRadius: 10 }} onClick={() => setQuickDue(2)}>
+                        +2 hrs
+                      </button>
+                      <button type="button" className="btn ghost" style={{ padding: '2px 7px', fontSize: 10.5, borderRadius: 10 }} onClick={() => setQuickDue(1, 10)}>
+                        Tomorrow 10 AM
+                      </button>
+                      <button type="button" className="btn ghost" style={{ padding: '2px 7px', fontSize: 10.5, borderRadius: 10 }} onClick={() => setQuickDue(2, 11)}>
+                        In 2 days
+                      </button>
+                      <button type="button" className="btn ghost" style={{ padding: '2px 7px', fontSize: 10.5, borderRadius: 10 }} onClick={() => setQuickDue(7, 10)}>
+                        Next week
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Attachments */}
                   <label
                     className="rowx"
                     style={{
-                      marginTop: 8,
+                      marginTop: 10,
                       gap: 6,
                       cursor: 'pointer',
                       border: '1px dashed var(--line, rgba(0, 201, 167, 0.35))',
@@ -361,6 +491,7 @@ export default function Record() {
                       {newAttachments.length > 0 ? `${newAttachments.length} file(s) attached` : 'Attach files (optional)'}
                     </span>
                   </label>
+
                   {newAttachments.length > 0 && (
                     <div className="rowx" style={{ marginTop: 6, gap: 6, flexWrap: 'wrap' }}>
                       {newAttachments.map((file, idx) => (
@@ -371,9 +502,20 @@ export default function Record() {
                       ))}
                     </div>
                   )}
-                  <div className="rowx sp" style={{ marginTop: 8 }}>
-                    <span className="tiny">Logging as <b>{ACTIVITY_TYPES.find((t) => t.type === activeType)?.label}</b></span>
-                    <button className="btn pri" style={{ padding: '5px 11px' }} onClick={addActivity}>＋ Add activity</button>
+
+                  {activityError && (
+                    <div className="tiny" style={{ color: 'var(--danger, #d64545)', marginTop: 8, background: 'rgba(214, 69, 69, 0.08)', padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(214, 69, 69, 0.2)' }}>
+                      ⚠ {activityError}
+                    </div>
+                  )}
+
+                  <div className="rowx sp" style={{ marginTop: 10 }}>
+                    <span className="tiny">
+                      Logging as <b>{ACTIVITY_TYPES.find((t) => t.type === activeType)?.label}</b>
+                    </span>
+                    <button className="btn pri" style={{ padding: '6px 14px', borderRadius: 16 }} onClick={addActivity}>
+                      📅 Schedule follow-up ✓
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -391,19 +533,59 @@ export default function Record() {
               )}
 
               <div className="tl">
-                {activities.map((a) => (
-                  <div className="tl-item" key={a.id}>
-                    <div className={`dot ${a.status === 'completed' ? 'g' : ''}`} onClick={() => a.status === 'open' && openCompleteModal(a)} style={{ cursor: a.status === 'open' ? 'pointer' : 'default' }}>
-                      {iconFor(a.activity_type)}
+                {activities.map((a) => {
+                  const isOverdue = a.status === 'open' && a.due_at && new Date(a.due_at) < new Date()
+                  return (
+                    <div className="tl-item" key={a.id}>
+                      <div
+                        className={`dot ${a.status === 'completed' ? 'g' : isOverdue ? 'warn' : ''}`}
+                        onClick={() => a.status === 'open' && openCompleteModal(a)}
+                        style={{ cursor: a.status === 'open' ? 'pointer' : 'default' }}
+                        title={a.status === 'open' ? 'Click to complete this activity' : 'Completed'}
+                      >
+                        {iconFor(a.activity_type)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="rowx sp" style={{ gap: 8 }}>
+                          <b style={{ fontSize: 12.5, textDecoration: a.status === 'completed' ? 'line-through' : 'none' }}>
+                            {a.subject}
+                          </b>
+                          <span className={`chip ${a.status === 'completed' ? 'ok' : isOverdue ? 'risk' : 'brand'}`} style={{ fontSize: 10, padding: '1px 6px', textTransform: 'uppercase' }}>
+                            {isOverdue ? 'Overdue' : a.status}
+                          </span>
+                        </div>
+
+                        <div className="rowx" style={{ gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
+                          <span className="tiny mut" style={{ textTransform: 'capitalize' }}>
+                            {a.activity_type}
+                          </span>
+                          {a.due_at && (
+                            <span className={`tiny ${isOverdue ? 'rec-overdue-tag' : 'rec-due-tag'}`} style={{ fontWeight: 600 }}>
+                              📅 Follow-up: {new Date(a.due_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                            </span>
+                          )}
+                          {!a.due_at && a.created_at && (
+                            <span className="tiny mut">
+                              Logged {new Date(a.created_at).toLocaleDateString()}
+                            </span>
+                          )}
+                          {a.completed_at && (
+                            <span className="tiny mut" style={{ color: 'var(--green, #00C9A7)' }}>
+                              ✓ Done {new Date(a.completed_at).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+
+                        {a.summary && (
+                          <div className="tiny" style={{ marginTop: 4, background: 'var(--surface2, rgba(0,0,0,0.03))', padding: '6px 8px', borderRadius: 8, fontStyle: 'italic', color: 'var(--ink)' }}>
+                            💬 {a.summary}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <b style={{ fontSize: 12.5, textDecoration: a.status === 'completed' ? 'line-through' : 'none' }}>{a.subject}</b>
-                      <div className="tiny">{a.activity_type} · {a.status}</div>
-                      {a.summary && <div className="tiny" style={{ marginTop: 2, fontStyle: 'italic' }}>{a.summary}</div>}
-                    </div>
-                  </div>
-                ))}
-                {activities.length === 0 && <div className="tiny">No activities logged yet.</div>}
+                  )
+                })}
+                {activities.length === 0 && <div className="tiny mut" style={{ padding: 12 }}>No activities logged yet.</div>}
               </div>
             </div>
 

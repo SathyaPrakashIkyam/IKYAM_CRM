@@ -26,6 +26,47 @@
   font: 500 12.5px var(--b);
 }
 
+.record-activity-datetime-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 12px var(--b);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.record-activity-datetime-input:focus {
+  border-color: var(--primary, #00C9A7);
+}
+
+.rec-due-tag {
+  color: #008a73;
+  background: rgba(0, 201, 167, 0.1);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+[data-theme="dark"] .rec-due-tag {
+  color: #00C9A7;
+  background: rgba(0, 201, 167, 0.18);
+}
+
+.rec-overdue-tag {
+  color: #d64545;
+  background: rgba(214, 69, 69, 0.12);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+[data-theme="dark"] .rec-overdue-tag {
+  color: #ff6b6b;
+  background: rgba(214, 69, 69, 0.22);
+}
+
 .rec-stagebar {
   display: flex;
   gap: 4px;
