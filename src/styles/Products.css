@@ -278,6 +278,7 @@
 .products-modal-card {
   width: 100%;
   max-width: 660px;
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(25px);
   -webkit-backdrop-filter: blur(25px);
@@ -351,13 +352,21 @@
 
 .products-modal-form-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 20px;
+  width: 100%;
+}
+
+.products-modal-form-grid > div {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .products-modal-full-width {
   grid-column: span 2;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .products-modal-label {
@@ -371,6 +380,8 @@
 
 .products-modal-input {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   height: 44px;
   padding: 0 16px;
   border-radius: 20px;
@@ -396,6 +407,8 @@
 
 .products-modal-custom-select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: block;
 }
 
@@ -407,6 +420,10 @@
   background: #FFFFFF;
   color: var(--ink, #192A32);
   font: 500 13.5px var(--b, system-ui, sans-serif);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 [data-theme="dark"] .products-modal-custom-select .custom-select-trigger {

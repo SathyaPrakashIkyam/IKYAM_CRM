@@ -7,6 +7,7 @@
   display: inline-block;
   user-select: none;
   min-width: 140px;
+  max-width: 100%;
 }
 
 .custom-select-container.open {
@@ -19,6 +20,9 @@
   justify-content: space-between;
   gap: 10px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   height: 38px;
   padding: 0 16px;
   border-radius: 19px;
@@ -48,6 +52,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
 }
 
 .custom-select-arrow {
@@ -129,12 +136,26 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 8px 14px;
   border-radius: 12px;
   font: 500 12.5px var(--b, system-ui, sans-serif);
   color: var(--ink, #2D2319);
   cursor: pointer;
   transition: all 0.15s ease;
+  min-width: 0;
+}
+
+.custom-select-option .rowx {
+  min-width: 0;
+  flex: 1;
+}
+
+.custom-select-option .rowx span {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+  min-width: 0;
 }
 
 .custom-select-option:hover,
@@ -157,6 +178,7 @@
   font-size: 12px;
   color: #00C9A7;
   font-weight: 800;
+  flex-shrink: 0;
 }
 
 .custom-select-checkbox {

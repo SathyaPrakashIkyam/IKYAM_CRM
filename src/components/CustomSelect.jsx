@@ -253,7 +253,12 @@ export default function CustomSelect({
         aria-controls={listboxId}
         aria-activedescendant={isOpen && highlightedIndex >= 0 ? `${listboxId}-opt-${highlightedIndex}` : undefined}
       >
-        <span className="custom-select-label">{renderLabel()}</span>
+        <span
+          className="custom-select-label"
+          title={typeof renderLabel() === 'string' ? renderLabel() : undefined}
+        >
+          {renderLabel()}
+        </span>
         <svg
           className={`custom-select-arrow ${isOpen ? 'open' : ''}`}
           width="12"
@@ -292,13 +297,13 @@ export default function CustomSelect({
                   onClick={() => handleSelect(opt.value)}
                   onMouseEnter={() => setHighlightedIndex(idx)}
                 >
-                  <div className="rowx" style={{ gap: 8, alignItems: 'center' }}>
+                  <div className="rowx" style={{ gap: 8, alignItems: 'center', minWidth: 0, flex: 1 }}>
                     {multiple && (
                       <div className={`custom-select-checkbox ${active ? 'checked' : ''}`}>
                         {active && '✓'}
                       </div>
                     )}
-                    <span>{opt.label}</span>
+                    <span title={typeof opt.label === 'string' ? opt.label : undefined}>{opt.label}</span>
                   </div>
                   {!multiple && active && <span className="custom-select-check">✓</span>}
                 </div>
