@@ -428,3 +428,83 @@
   transform: translateY(-2px);
   box-shadow: 0 12px 32px rgba(0, 201, 167, 0.5) !important;
 }
+
+/* Priority Badges */
+.lead-priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 700 11px var(--b, system-ui, sans-serif);
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+}
+
+.lead-priority-badge.hot {
+  background: rgba(239, 68, 68, 0.12);
+  color: #DC2626;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
+.lead-priority-badge.warm {
+  background: rgba(245, 158, 11, 0.12);
+  color: #D97706;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.lead-priority-badge.cold {
+  background: rgba(0, 114, 206, 0.1);
+  color: #0072CE;
+  border: 1px solid rgba(0, 114, 206, 0.25);
+}
+
+[data-theme="dark"] .lead-priority-badge.hot {
+  background: rgba(239, 68, 68, 0.2);
+  color: #F87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+[data-theme="dark"] .lead-priority-badge.warm {
+  background: rgba(245, 158, 11, 0.2);
+  color: #FBBF24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+[data-theme="dark"] .lead-priority-badge.cold {
+  background: rgba(0, 114, 206, 0.18);
+  color: #38BDF8;
+  border-color: rgba(0, 114, 206, 0.35);
+}
+
+/* Modal Textarea */
+textarea.lead-modal-input {
+  height: auto;
+  min-height: 75px;
+  padding: 12px 18px;
+  border-radius: 16px;
+  resize: vertical;
+}
+
+/* Modal DateInput adaptation */
+.lead-modal-date-input {
+  height: 44px !important;
+  border-radius: 22px !important;
+  border: 1.5px solid rgba(0, 201, 167, 0.22) !important;
+  padding: 0 18px !important;
+  box-shadow: 0 2px 8px rgba(0, 100, 120, 0.04) !important;
+}
+
+.lead-modal-date-input:focus-within {
+  border-color: #00C9A7 !important;
+  box-shadow: 0 0 0 4px rgba(0, 201, 167, 0.2), 0 4px 14px rgba(0, 201, 167, 0.12) !important;
+}
+
+[data-theme="dark"] .lead-modal-date-input {
+  background: rgba(8, 24, 30, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.lead-modal-date-input .quotes-date-display-val {
+  font: 500 13.5px var(--b, system-ui, sans-serif) !important;
+}
+

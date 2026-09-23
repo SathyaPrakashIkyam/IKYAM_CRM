@@ -1,11 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
-import { leadsApi } from '../api/endpoints'
+import DateInput from '../components/DateInput'
+import { leadsApi, currenciesApi } from '../api/endpoints'
 import { useAuth } from '../context/AuthContext'
 import '../styles/ikyam-mock.css'
 import '../styles/Leads.css'
+
+const PRIORITY_OPTIONS = [
+  { value: 'Hot', label: '🔥 Hot' },
+  { value: 'Warm', label: '⚡ Warm' },
+  { value: 'Cold', label: '❄️ Cold' },
+]
 
 // Completion percentage: red < 50, yellow 50–99, green = 100
 function completionColor(pct) {
@@ -102,10 +109,18 @@ export default function Leads() {
   const [showNew, setShowNew] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [showConvert, setShowConvert] = useState(false)
+  const [currencies, setCurrencies] = useState([])
+
   const emptyLead = {
     first_name: '',
     last_name: '',
     company_name: '',
+    designation: '',
+    currency: 'INR',
+    potential_amount: '',
+    expected_close_date: '',
+    priority: 'Warm',
+    description: '',
     industry: '',
     email: '',
     phone: '',
@@ -117,7 +132,6 @@ export default function Leads() {
     state: '',
     country: '',
     pincode: '',
-    potential_amount: '',
   }
   const [newLead, setNewLead] = useState(emptyLead)
   const [showMore, setShowMore] = useState(false)
@@ -125,6 +139,19 @@ export default function Leads() {
   const navigate = useNavigate()
   const location = useLocation()
   const { companyId } = useAuth()
+
+  useEffect(() => {
+    currenciesApi.list().then((res) => {
+      if (Array.isArray(res)) setCurrencies(res)
+    }).catch(() => {})
+  }, [])
+
+  const currencyOptions = useMemo(() => {
+    const baseCurrs = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'JPY', 'CAD', 'AUD']
+    const loaded = currencies.map((c) => c.code).filter(Boolean)
+    const combined = Array.from(new Set([...baseCurrs, ...loaded]))
+    return combined.map((code) => ({ value: code, label: code }))
+  }, [currencies])
 
   function toCamelCase(value) {
     return value
@@ -142,6 +169,12 @@ export default function Leads() {
       first_name: lead.first_name || '',
       last_name: lead.last_name || '',
       company_name: lead.company_name || '',
+      designation: lead.designation || '',
+      currency: lead.currency || 'INR',
+      potential_amount: lead.potential_amount != null ? String(lead.potential_amount) : '',
+      expected_close_date: lead.expected_close_date ? String(lead.expected_close_date).split('T')[0] : '',
+      priority: lead.priority || 'Warm',
+      description: lead.description || '',
       industry: lead.industry || '',
       email: lead.email || '',
       phone: lead.phone || '',
@@ -153,7 +186,6 @@ export default function Leads() {
       state: lead.state || '',
       country: lead.country || '',
       pincode: lead.pincode || '',
-      potential_amount: lead.potential_amount != null ? String(lead.potential_amount) : '',
     })
     const hasOptional = Boolean(
       lead.industry || lead.address_line1 || lead.address_line2 ||
@@ -172,6 +204,12 @@ export default function Leads() {
           first_name: orig.first_name || '',
           last_name: orig.last_name || '',
           company_name: orig.company_name || '',
+          designation: orig.designation || '',
+          currency: orig.currency || 'INR',
+          potential_amount: orig.potential_amount != null ? String(orig.potential_amount) : '',
+          expected_close_date: orig.expected_close_date ? String(orig.expected_close_date).split('T')[0] : '',
+          priority: orig.priority || 'Warm',
+          description: orig.description || '',
           industry: orig.industry || '',
           email: orig.email || '',
           phone: orig.phone || '',
@@ -183,7 +221,6 @@ export default function Leads() {
           state: orig.state || '',
           country: orig.country || '',
           pincode: orig.pincode || '',
-          potential_amount: orig.potential_amount != null ? String(orig.potential_amount) : '',
         })
         return
       }
@@ -248,6 +285,12 @@ export default function Leads() {
       first_name: toCamelCase(firstName),
       last_name: toCamelCase(lastName),
       company_name: companyName,
+      designation: newLead.designation.trim() || undefined,
+      currency: newLead.currency || 'INR',
+      potential_amount: Number(newLead.potential_amount),
+      expected_close_date: newLead.expected_close_date ? newLead.expected_close_date.split('T')[0] : undefined,
+      priority: newLead.priority || 'Warm',
+      description: newLead.description.trim() || undefined,
       industry: newLead.industry || undefined,
       email: email || undefined,
       phone: phone || undefined,
@@ -259,7 +302,6 @@ export default function Leads() {
       state: newLead.state || undefined,
       country: newLead.country || undefined,
       pincode: newLead.pincode || undefined,
-      potential_amount: Number(newLead.potential_amount),
     }
 
     try {
@@ -332,11 +374,19 @@ export default function Leads() {
                     <div className="rowx">
                       <CircularProgress value={lead.completion_percentage} />
                       <div>
-                        <b>{lead.name}</b>
-                        <div className="tiny">
-                          {lead.source}
-                          {lead.status === 'qualified' && <span className="chip ok" style={{ marginLeft: 6 }}>converted</span>}
-                          {lead.status === 'disqualified' && <span className="chip risk" style={{ marginLeft: 6 }}>disqualified</span>}
+                        <div className="rowx" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <b>{lead.name}</b>
+                          {lead.designation && <span className="tiny mut" style={{ fontWeight: 500 }}>({lead.designation})</span>}
+                        </div>
+                        <div className="tiny" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                          <span>{lead.source}</span>
+                          {lead.priority && (
+                            <span className={`lead-priority-badge ${(lead.priority || '').toLowerCase()}`}>
+                              {lead.priority === 'Hot' ? '🔥 Hot' : lead.priority === 'Warm' ? '⚡ Warm' : '❄️ Cold'}
+                            </span>
+                          )}
+                          {lead.status === 'qualified' && <span className="chip ok" style={{ marginLeft: 2 }}>converted</span>}
+                          {lead.status === 'disqualified' && <span className="chip risk" style={{ marginLeft: 2 }}>disqualified</span>}
                         </div>
                       </div>
                     </div>
@@ -350,8 +400,17 @@ export default function Leads() {
                 <>
                   <div className="rowx sp" style={{ flexWrap: 'wrap', gap: 10 }}>
                     <div>
-                      <b style={{ font: '600 15px var(--d)' }}>{selected.name}</b>
-                      <div className="tiny">{selected.lead_no} · {selected.source} · {selected.company_name || 'no company on file'}</div>
+                      <div className="rowx" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <b style={{ font: '600 15px var(--d)' }}>{selected.name}</b>
+                        {selected.priority && (
+                          <span className={`lead-priority-badge ${(selected.priority || '').toLowerCase()}`}>
+                            {selected.priority === 'Hot' ? '🔥 Hot' : selected.priority === 'Warm' ? '⚡ Warm' : '❄️ Cold'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="tiny" style={{ marginTop: 2 }}>
+                        {selected.lead_no} · {selected.designation ? `${selected.designation} · ` : ''}{selected.source} · {selected.company_name || 'no company on file'}
+                      </div>
                     </div>
                     <div className="rowx">
                       <button className="btn" onClick={() => openEdit(selected)}>Edit</button>
@@ -391,9 +450,33 @@ export default function Leads() {
                       <span className="lab">Captured</span>
                       <div className="fld"><span className="lab">Status</span>{selected.status}</div>
                       <div className="fld"><span className="lab">Company</span>{selected.company_name || '—'}</div>
+                      <div className="fld"><span className="lab">Designation</span>{selected.designation || '—'}</div>
+                      <div className="fld">
+                        <span className="lab">Priority</span>
+                        {selected.priority ? (
+                          <span className={`lead-priority-badge ${(selected.priority || '').toLowerCase()}`}>
+                            {selected.priority === 'Hot' ? '🔥 Hot' : selected.priority === 'Warm' ? '⚡ Warm' : '❄️ Cold'}
+                          </span>
+                        ) : '—'}
+                      </div>
+                      <div className="fld">
+                        <span className="lab">Potential value</span>
+                        <b>{selected.currency || 'INR'} {selected.potential_amount != null ? Number(selected.potential_amount).toLocaleString() : '—'}</b>
+                      </div>
+                      <div className="fld"><span className="lab">Expected close</span>{selected.expected_close_date ? String(selected.expected_close_date).split('T')[0] : '—'}</div>
                       <div className="fld"><span className="lab">Industry</span>{selected.industry || '—'}</div>
                       <div className="fld"><span className="lab">Email</span>{selected.email || '—'}</div>
-                      <div className="fld" style={{ border: 0 }}><span className="lab">Phone</span>{selected.phone || '—'}</div>
+                      <div className="fld" style={{ border: selected.description ? '1px solid var(--line)' : 0 }}>
+                        <span className="lab">Phone</span>{selected.phone || '—'}
+                      </div>
+                      {selected.description && (
+                        <div className="fld" style={{ border: 0, flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                          <span className="lab">Description</span>
+                          <div style={{ font: '400 12.5px var(--b)', color: 'var(--ink)', whiteSpace: 'pre-wrap', lineHeight: 1.5, marginTop: 2 }}>
+                            {selected.description}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="ai-frame" style={{ padding: 12 }}>
                       <span className="ai-tag">FIRST TOUCH</span>
@@ -478,6 +561,15 @@ export default function Leads() {
                     />
                   </div>
                   <div>
+                    <label className="lead-modal-label">Designation</label>
+                    <input
+                      placeholder="e.g. VP of Sales"
+                      className="lead-modal-input"
+                      value={newLead.designation}
+                      onChange={(e) => setNewLead({ ...newLead, designation: e.target.value })}
+                    />
+                  </div>
+                  <div>
                     <label className="lead-modal-label">Potential amount *</label>
                     <input
                       required
@@ -488,6 +580,34 @@ export default function Leads() {
                       className="lead-modal-input"
                       value={newLead.potential_amount}
                       onChange={(e) => setNewLead({ ...newLead, potential_amount: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="lead-modal-label">Currency *</label>
+                    <CustomSelect
+                      options={currencyOptions}
+                      value={newLead.currency}
+                      onChange={(val) => setNewLead({ ...newLead, currency: val })}
+                      className="lead-modal-custom-select"
+                    />
+                  </div>
+                  <div>
+                    <label className="lead-modal-label">Expected close date</label>
+                    <DateInput
+                      value={newLead.expected_close_date}
+                      onChange={(val) => setNewLead({ ...newLead, expected_close_date: val })}
+                      placeholder="YYYY-MM-DD"
+                      clearable={true}
+                      className="lead-modal-date-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="lead-modal-label">Priority *</label>
+                    <CustomSelect
+                      options={PRIORITY_OPTIONS}
+                      value={newLead.priority}
+                      onChange={(val) => setNewLead({ ...newLead, priority: val })}
+                      className="lead-modal-custom-select"
                     />
                   </div>
                   <div>
@@ -539,6 +659,16 @@ export default function Leads() {
                       />
                     </div>
                   )}
+                  <div className="lead-modal-full-width">
+                    <label className="lead-modal-label">Description</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Add background, notes, requirements or context for this lead..."
+                      className="lead-modal-input"
+                      value={newLead.description}
+                      onChange={(e) => setNewLead({ ...newLead, description: e.target.value })}
+                    />
+                  </div>
                 </div>
 
                 {/* Additional optional fields (revealed via Show more options) */}
