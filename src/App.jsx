@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Onboarding from './pages/Onboarding'
 import OnboardingList from './pages/OnboardingList'
 import Login from './pages/Login'
+import SetPassword from './pages/SetPassword'
 import Users from './pages/Users'
 import UserForm from './pages/UserForm'
 import Today from './pages/Today'
@@ -43,6 +44,9 @@ function AppRoutes() {
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/onboarding-list" element={<ProtectedRoute><OnboardingList /></ProtectedRoute>} />
       <Route path="/login" element={<Login />} />
+      <Route path="/setPassword" element={<SetPassword />} />
+      <Route path="/resetPassword" element={<SetPassword />} />
+      <Route path="/forgot-password" element={<SetPassword />} />
 
       <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
       <Route path="/users/new" element={<ProtectedRoute><UserForm /></ProtectedRoute>} />

@@ -57,6 +57,22 @@ export const userMasterApi = {
       .then((r) => r.data),
 }
 
+export const passwordApi = {
+  forgotPassword: (email) =>
+    api.post('/user_master/email/forget_password', { email }).then((r) => r.data),
+  validateOtp: (email, otp) =>
+    api.post('/user_master/email/validate_otp', { email, otp }).then((r) => r.data),
+  changePasswordWithOtp: (email, otp, newPassword, confirmPassword) =>
+    api
+      .post('/user_master/email/change_password', {
+        email,
+        otp,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      })
+      .then((r) => r.data),
+}
+
 export const leadsApi = {
   list: (companyId, statusFilter) =>
     api.get('/leads', { params: { company_id: companyId, status_filter: statusFilter } }).then((r) => r.data),

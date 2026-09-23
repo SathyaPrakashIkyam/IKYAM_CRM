@@ -231,15 +231,23 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="login-remember-row">
+            <div className="login-remember-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label className="login-remember-label">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
-                <span>Remember me on this device</span>
+                <span>Remember me</span>
               </label>
+
+              <Link
+                to={form.email ? `/setPassword?email=${encodeURIComponent(form.email)}` : '/setPassword'}
+                className="login-forgot-link"
+                style={{ fontSize: '13px', color: '#3182ce', textDecoration: 'none', fontWeight: 500 }}
+              >
+                Forgot password?
+              </Link>
             </div>
 
             <button type="submit" className="login-submit-btn" disabled={saving}>
