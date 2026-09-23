@@ -45,9 +45,48 @@ export default function Contacts() {
     })
     accountsApi.list(companyId).then(setAccounts).catch(() => {})
     leadsApi.list(companyId).then(setLeads).catch(() => {})
+    if (location.state?.accountFilter) {
+      setAccountFilter(location.state.accountFilter)
+    }
   }
 
   useEffect(load, [companyId, location.state])
+
+  const currentLockedAccount = useMemo(() => {
+    if (accountFilter && accountFilter !== 'all') {
+      return accounts.find((a) => a.id === accountFilter) || null
+    }
+    return null
+  }, [accountFilter, accounts])
+
+  const currentLockedLead = useMemo(() => {
+    if (location.state?.leadId) {
+      const byId = leads.find((l) => l.id === location.state.leadId)
+      if (byId) return byId
+    }
+    if (currentLockedAccount) {
+      return (
+        leads.find(
+          (l) =>
+            l.company_name &&
+            (l.company_name || '').trim().toLowerCase() === (currentLockedAccount.name || '').trim().toLowerCase()
+        ) || null
+      )
+    }
+    return null
+  }, [location.state, currentLockedAccount, leads])
+
+  const isCompanyLocked = Boolean(currentLockedAccount || (location.state?.leadId && currentLockedLead))
+
+  function handleOpenNew() {
+    setFormError('')
+    setNewContact({
+      ...emptyContact,
+      account_id: currentLockedAccount?.id || (accountFilter !== 'all' ? accountFilter : ''),
+      lead_id: currentLockedLead?.id || (location.state?.leadId || ''),
+    })
+    setShowNew(true)
+  }
 
   async function createContact(e) {
     e.preventDefault()
@@ -55,13 +94,34 @@ export default function Contacts() {
     if (!newContact.first_name.trim()) return setFormError('First name is required')
     if (!newContact.last_name.trim()) return setFormError('Last name is required')
 
+    const emailTrimmed = (newContact.primary_email || '').trim()
+    if (!emailTrimmed) return setFormError('Work email is required')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(emailTrimmed)) {
+      return setFormError('Please enter a valid work email address')
+    }
+
+    const phoneDigits = (newContact.primary_phone || '').replace(/\D/g, '')
+    if (!phoneDigits) return setFormError('Phone number is required')
+    if (phoneDigits.length !== 10) return setFormError('Phone number must be exactly 10 digits')
+
+    const accId = isCompanyLocked
+      ? (currentLockedAccount?.id || (accountFilter !== 'all' ? accountFilter : undefined))
+      : (newContact.account_id || undefined)
+
+    const ldId = isCompanyLocked
+      ? (currentLockedLead?.id || (location.state?.leadId || undefined))
+      : (newContact.lead_id || undefined)
+
     const payload = {
       ...newContact,
-      account_id: newContact.account_id || undefined,
-      lead_id: newContact.lead_id || undefined,
-      primary_email: newContact.primary_email || undefined,
-      primary_phone: newContact.primary_phone || undefined,
-      title: newContact.title || undefined,
+      first_name: newContact.first_name.trim(),
+      last_name: newContact.last_name.trim(),
+      account_id: accId || undefined,
+      lead_id: ldId || undefined,
+      primary_email: emailTrimmed,
+      primary_phone: phoneDigits,
+      title: newContact.title ? newContact.title.trim() : undefined,
     }
 
     try {
@@ -99,6 +159,16 @@ export default function Contacts() {
     })
   }, [contacts, accounts, searchQuery, accountFilter])
 
+  useEffect(() => {
+    if (filteredContacts.length > 0) {
+      if (!selected || !filteredContacts.some((c) => c.id === selected.id)) {
+        setSelected(filteredContacts[0])
+      }
+    } else {
+      setSelected(null)
+    }
+  }, [filteredContacts])
+
   function avatarInitials(c) {
     const f = (c.first_name || '')[0] || ''
     const l = (c.last_name || '')[0] || (c.last_name || '').slice(0, 2)
@@ -126,7 +196,7 @@ export default function Contacts() {
                   <button
                     className="btn pri"
                     style={{ padding: '6px 14px', borderRadius: 18 }}
-                    onClick={() => { setFormError(''); setNewContact(emptyContact); setShowNew(true) }}
+                    onClick={handleOpenNew}
                   >
                     ＋ New contact
                   </button>
@@ -340,36 +410,59 @@ export default function Contacts() {
                   </div>
 
                   <div className="contact-modal-full-width">
-                    <label className="contact-modal-label">Lead - Company</label>
-                    <CustomSelect
-                      options={[
-                        { value: '', label: 'Select a lead\'s company...' },
-                        ...leads
-                          .filter((l) => l.company_name)
-                          .map((l) => ({ value: l.id, label: `${l.company_name} (Lead ${l.lead_no})` })),
-                      ]}
-                      value={newContact.lead_id}
-                      onChange={(val) => {
-                        // Driven by the Lead's own company name now, not a
-                        // separate Account picker — the matching Account (if
-                        // this lead has already converted) is found by
-                        // company name and attached automatically, instead
-                        // of making the user pick both by hand.
-                        const lead = leads.find((l) => l.id === val)
-                        const matchedAccount = lead
-                          ? accounts.find((a) => (a.name || '').trim().toLowerCase() === (lead.company_name || '').trim().toLowerCase())
-                          : null
-                        setNewContact({ ...newContact, lead_id: val, account_id: matchedAccount?.id || '' })
-                      }}
-                      className="contact-modal-custom-select"
-                      placeholder="Select a lead's company..."
-                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <label className="contact-modal-label" style={{ marginBottom: 0 }}>Lead – Company</label>
+                      {isCompanyLocked && (
+                        <span className="contact-locked-tag">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 4, display: 'inline-block', verticalAlign: '-1px' }}>
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                          Locked to company
+                        </span>
+                      )}
+                    </div>
+                    {isCompanyLocked ? (
+                      <div>
+                        <div className="contact-locked-field">
+                          <span className="contact-locked-icon">🏢</span>
+                          <span className="contact-locked-name">
+                            {currentLockedLead?.company_name
+                              ? `${currentLockedLead.company_name} ${currentLockedLead.lead_no ? `(Lead ${currentLockedLead.lead_no})` : ''}`
+                              : currentLockedAccount?.name || 'Current Company'}
+                          </span>
+                        </div>
+                        <div className="tiny mut" style={{ marginTop: 4, fontSize: 11 }}>
+                          This contact will be automatically linked to <b>{currentLockedAccount?.name || currentLockedLead?.company_name}</b>.
+                        </div>
+                      </div>
+                    ) : (
+                      <CustomSelect
+                        options={[
+                          { value: '', label: 'Select a lead\'s company...' },
+                          ...leads
+                            .filter((l) => l.company_name)
+                            .map((l) => ({ value: l.id, label: `${l.company_name} (Lead ${l.lead_no})` })),
+                        ]}
+                        value={newContact.lead_id}
+                        onChange={(val) => {
+                          const lead = leads.find((l) => l.id === val)
+                          const matchedAccount = lead
+                            ? accounts.find((a) => (a.name || '').trim().toLowerCase() === (lead.company_name || '').trim().toLowerCase())
+                            : null
+                          setNewContact({ ...newContact, lead_id: val, account_id: matchedAccount?.id || '' })
+                        }}
+                        className="contact-modal-custom-select"
+                        placeholder="Select a lead's company..."
+                      />
+                    )}
                   </div>
 
                   <div>
-                    <label className="contact-modal-label">Work Email</label>
+                    <label className="contact-modal-label">Work Email *</label>
                     <input
                       type="email"
+                      required
                       placeholder="name@company.com"
                       className="contact-modal-input"
                       value={newContact.primary_email}
@@ -378,10 +471,13 @@ export default function Contacts() {
                   </div>
 
                   <div>
-                    <label className="contact-modal-label">Phone Number</label>
+                    <label className="contact-modal-label">Phone Number *</label>
                     <input
-                      type="text"
+                      type="tel"
+                      required
                       maxLength={10}
+                      pattern="[0-9]{10}"
+                      title="10-digit mobile number"
                       placeholder="10-digit phone number"
                       className="contact-modal-input"
                       value={newContact.primary_phone}

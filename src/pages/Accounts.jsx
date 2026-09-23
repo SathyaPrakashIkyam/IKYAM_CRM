@@ -181,7 +181,12 @@ export default function Accounts() {
                     <div>
                       <div className="lab">Contacts ({related.contacts.length})</div>
                       {related.contacts.map((c) => (
-                        <div className="card hov" key={c.id} style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }} onClick={() => navigate('/contacts')}>
+                        <div
+                          className="card hov"
+                          key={c.id}
+                          style={{ marginTop: 8, padding: '9px 11px', cursor: 'pointer' }}
+                          onClick={() => navigate('/contacts', { state: { accountFilter: selected.id, openId: c.id } })}
+                        >
                           <b style={{ fontSize: 12 }}>{c.first_name} {c.last_name}</b>
                           <div className="tiny">{c.title || '—'}</div>
                         </div>

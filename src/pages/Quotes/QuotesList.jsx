@@ -91,16 +91,16 @@ export default function QuotesList() {
     return [{ value: 'all', label: 'All Accounts' }, ...Array.from(seen, ([value, label]) => ({ value, label }))]
   }, [quotes])
 
-  // Metric strip summary
+  // Metric strip summary (reflects filtered quotes when opened from a specific deal/lead or filter)
   const metrics = useMemo(() => {
-    const totalVal = quotes.reduce((sum, q) => sum + (q.total || 0), 0)
-    const draftQuotes = quotes.filter((q) => q.status === 'draft' || q.erp_sync_status === 'pending')
+    const totalVal = filteredQuotes.reduce((sum, q) => sum + (q.total || 0), 0)
+    const draftQuotes = filteredQuotes.filter((q) => q.status === 'draft' || q.erp_sync_status === 'pending')
     const draftVal = draftQuotes.reduce((sum, q) => sum + (q.total || 0), 0)
-    const approvedQuotes = quotes.filter((q) => q.status === 'approved' || q.erp_sync_status === 'synced')
+    const approvedQuotes = filteredQuotes.filter((q) => q.status === 'approved' || q.erp_sync_status === 'synced')
     const approvedVal = approvedQuotes.reduce((sum, q) => sum + (q.total || 0), 0)
-    const sapCount = quotes.filter((q) => q.quote_type === 'sap_b1').length
+    const sapCount = filteredQuotes.filter((q) => q.quote_type === 'sap_b1').length
     return { totalVal, draftVal, draftQuotes: draftQuotes.length, approvedVal, approvedQuotes: approvedQuotes.length, sapCount }
-  }, [quotes])
+  }, [filteredQuotes])
 
   return (
     <AppShell>
@@ -198,7 +198,7 @@ export default function QuotesList() {
           <div className="quotes-metric-col">
             <span className="quotes-metric-label">Total Quotes</span>
             <span className="quotes-metric-num">₹{formatINR(metrics.totalVal)}</span>
-            <span className="tiny mut">{quotes.length} total quotes</span>
+            <span className="tiny mut">{filteredQuotes.length} total quotes</span>
           </div>
           <div className="quotes-metric-col">
             <span className="quotes-metric-label">Draft &amp; Pending</span>

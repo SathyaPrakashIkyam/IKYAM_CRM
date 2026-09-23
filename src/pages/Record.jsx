@@ -467,7 +467,14 @@ export default function Record() {
                     <span className="tiny" style={{ color: 'var(--primary, #00C9A7)', fontWeight: 600 }}>+ New quote</span>
                   )}
                 </div>
-                <div className="rec-related-row" onClick={() => navigate('/contacts', { state: { accountFilter: opp.account_id } })}>
+                <div
+                  className="rec-related-row"
+                  onClick={() =>
+                    navigate('/contacts', {
+                      state: { accountFilter: opp.account_id, leadId: opp.source_lead_id },
+                    })
+                  }
+                >
                   <span className="tiny">Contacts</span>
                   <b className="tiny">{contactsCount ?? '—'}</b>
                 </div>
