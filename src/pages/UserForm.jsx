@@ -351,15 +351,13 @@ export default function UserForm() {
               <div className="userform-grid-2">
                 <div className="userform-field">
                   <label className="userform-label">
-                    Email Address * {isEditMode && <span className="tiny mut">(Locked)</span>}
+                    Email Address *
                   </label>
                   <div className="userform-input-wrapper">
                     <input
                       required
-                      disabled={isEditMode}
                       type="email"
                       className="userform-input"
-                      style={isEditMode ? { opacity: 0.65, cursor: 'not-allowed', background: 'var(--surface2)' } : {}}
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       placeholder="name@company.com"

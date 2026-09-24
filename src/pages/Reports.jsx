@@ -26,6 +26,10 @@ function formatCell(col, value) {
   if (col === 'avg_age_days') return `${value}d`
   if (col === 'value') return `₹${Number(value).toLocaleString('en-IN')}`
   if (col === 'conversion_pct') return `${value}%`
+  if (col === 'source') {
+    const map = { manual: 'Manual', web: 'Web', referral: 'Referral', event: 'Event', partner: 'Partner', other: 'Other' }
+    return map[String(value).toLowerCase()] || (String(value).charAt(0).toUpperCase() + String(value).slice(1))
+  }
   return String(value)
 }
 

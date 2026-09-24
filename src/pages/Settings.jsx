@@ -643,7 +643,11 @@ function CustomFieldsPanel() {
    Panel 3: Notification Settings (activity reminder timing)
    ========================================================================== */
 function NotificationSettingsPanel() {
-  const [reminderMinutes, setReminderMinutes] = useState(15)
+  const [notifMinutes, setNotifMinutes] = useState(15)
+  const [notifEnabled, setNotifEnabled] = useState(true)
+  const [emailMinutes, setEmailMinutes] = useState(30)
+  const [emailEnabled, setEmailEnabled] = useState(true)
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -653,7 +657,13 @@ function NotificationSettingsPanel() {
     setLoading(true)
     settingsApi
       .getGeneral()
-      .then((data) => setReminderMinutes(data.settings?.activity_reminder_minutes ?? 15))
+      .then((data) => {
+        const s = data.settings || {}
+        setNotifMinutes(s.activity_reminder_minutes ?? 15)
+        setNotifEnabled(s.activity_notif_reminder_enabled ?? true)
+        setEmailMinutes(s.activity_email_reminder_minutes ?? 30)
+        setEmailEnabled(s.activity_email_reminder_enabled ?? true)
+      })
       .catch((err) => {
         console.error('Failed to load notification settings:', err)
         setError('Unable to load notification settings')
@@ -666,12 +676,17 @@ function NotificationSettingsPanel() {
     setSaving(true)
     setError(null)
     try {
-      await settingsApi.updateGeneral({ activity_reminder_minutes: reminderMinutes })
+      await settingsApi.updateGeneral({
+        activity_reminder_minutes: notifMinutes,
+        activity_notif_reminder_enabled: notifEnabled,
+        activity_email_reminder_minutes: emailMinutes,
+        activity_email_reminder_enabled: emailEnabled,
+      })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       console.error('Failed to save notification settings:', err)
-      setError(err?.response?.data?.detail || 'Failed to update reminder timing')
+      setError(err?.response?.data?.detail || 'Failed to update notification settings')
     } finally {
       setSaving(false)
     }
@@ -684,12 +699,11 @@ function NotificationSettingsPanel() {
         <div style={{ fontSize: 26, lineHeight: 1 }}>⏰</div>
         <div>
           <h4 style={{ margin: 0, font: '800 16px var(--d)', color: 'var(--ink)' }}>
-            In-App Activity Reminders
+            Activity Reminders & Email Notifications
           </h4>
           <p className="tiny" style={{ marginTop: 4, color: 'var(--mut)', lineHeight: 1.5 }}>
-            Every open task, call and meeting fires an in-app notification a set number of minutes before its
-            due or start time. Change that lead time here — it applies company-wide and takes effect on the
-            next reminder check, no restart needed.
+            Configure independent timing and notification channels for upcoming calls, tasks, and meetings. 
+            In-app bell notifications and sales rep reminder emails can each be scheduled and toggled separately.
           </p>
         </div>
       </div>
@@ -701,34 +715,134 @@ function NotificationSettingsPanel() {
           </div>
         )}
 
-        <div className="settings-card">
-          <div className="settings-section-head">
-            <div className="settings-section-icon">⏰</div>
-            <div>
-              <h3 className="settings-section-title">Activity Reminder Timing</h3>
-              <div className="settings-section-subtitle">
-                How long before a task/call/meeting's due or start time its in-app notification fires
+        {/* ==========================================================================
+            CARD 1: IN-APP BELL NOTIFICATIONS
+            ========================================================================== */}
+        <div className="settings-card" style={{ marginBottom: 20 }}>
+          <div className="settings-section-head" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="rowx" style={{ gap: 14, alignItems: 'center' }}>
+              <div className="settings-section-icon" style={{ background: 'rgba(0, 201, 167, 0.12)', color: '#00A68A' }}>
+                🔔
+              </div>
+              <div>
+                <div className="rowx" style={{ gap: 8, alignItems: 'center' }}>
+                  <h3 className="settings-section-title">In-App Bell Notifications</h3>
+                  <span className={`chip ${notifEnabled ? 'ok' : 'draft'}`} style={{ fontSize: 11, padding: '2px 8px' }}>
+                    {notifEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div className="settings-section-subtitle">
+                  Real-time alerts displayed in the CRM top navigation bell for upcoming activities
+                </div>
+              </div>
+            </div>
+
+            {/* Toggle Switch */}
+            <label className="settings-switch" title={notifEnabled ? 'Disable In-App Notifications' : 'Enable In-App Notifications'}>
+              <input
+                type="checkbox"
+                checked={notifEnabled}
+                onChange={(e) => setNotifEnabled(e.target.checked)}
+                disabled={loading || saving}
+              />
+              <span className="settings-switch-slider" />
+            </label>
+          </div>
+
+          <div style={{ opacity: notifEnabled ? 1 : 0.45, pointerEvents: notifEnabled ? 'auto' : 'none', transition: 'opacity 0.2s ease' }}>
+            <div className="settings-form-grid">
+              <div className="settings-form-group">
+                <label className="settings-form-label">In-App Alert Lead Time (minutes before due)</label>
+
+                <div className="rowx" style={{ gap: 10, alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={1440}
+                    required={notifEnabled}
+                    value={notifMinutes}
+                    onChange={(e) => setNotifMinutes(Number(e.target.value))}
+                    className="settings-input"
+                    style={{ maxWidth: 160 }}
+                    disabled={loading || saving || !notifEnabled}
+                  />
+                  <span className="tiny mut">minutes before activity starts or is due</span>
+                </div>
+
+                <span className="tiny mut" style={{ marginTop: 6 }}>
+                  {notifEnabled ? (
+                    <>In-app bell alert will trigger <b>{notifMinutes || 15} minutes</b> prior to scheduled calls, tasks, and meetings.</>
+                  ) : (
+                    <>In-app bell alerts are currently disabled.</>
+                  )}
+                </span>
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="settings-form-grid">
-            <div className="settings-form-group">
-              <label className="settings-form-label">Remind me before (minutes)</label>
+        {/* ==========================================================================
+            CARD 2: EMAIL REMINDERS TO SALES REPRESENTATIVES
+            ========================================================================== */}
+        <div className="settings-card" style={{ marginBottom: 20 }}>
+          <div className="settings-section-head" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="rowx" style={{ gap: 14, alignItems: 'center' }}>
+              <div className="settings-section-icon" style={{ background: 'rgba(0, 114, 206, 0.12)', color: '#0072CE' }}>
+                ✉️
+              </div>
+              <div>
+                <div className="rowx" style={{ gap: 8, alignItems: 'center' }}>
+                  <h3 className="settings-section-title">Email Reminder Notifications</h3>
+                  <span className={`chip ${emailEnabled ? 'ok' : 'draft'}`} style={{ fontSize: 11, padding: '2px 8px' }}>
+                    {emailEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div className="settings-section-subtitle">
+                  Automated branded reminder emails sent to the assigned sales employee
+                </div>
+              </div>
+            </div>
+
+            {/* Toggle Switch */}
+            <label className="settings-switch" title={emailEnabled ? 'Disable Email Reminders' : 'Enable Email Reminders'}>
               <input
-                type="number"
-                min={1}
-                max={1440}
-                required
-                value={reminderMinutes}
-                onChange={(e) => setReminderMinutes(Number(e.target.value))}
-                className="settings-input"
-                style={{ maxWidth: 160 }}
+                type="checkbox"
+                checked={emailEnabled}
+                onChange={(e) => setEmailEnabled(e.target.checked)}
                 disabled={loading || saving}
               />
-              <span className="tiny mut" style={{ marginTop: 2 }}>
-                Applies to every open task, call and meeting across the company — e.g. 15 or 30 minutes ahead
-              </span>
+              <span className="settings-switch-slider" />
+            </label>
+          </div>
+
+          <div style={{ opacity: emailEnabled ? 1 : 0.45, pointerEvents: emailEnabled ? 'auto' : 'none', transition: 'opacity 0.2s ease' }}>
+            <div className="settings-form-grid">
+              <div className="settings-form-group">
+                <label className="settings-form-label">Email Reminder Lead Time (minutes before due)</label>
+
+                <div className="rowx" style={{ gap: 10, alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={1440}
+                    required={emailEnabled}
+                    value={emailMinutes}
+                    onChange={(e) => setEmailMinutes(Number(e.target.value))}
+                    className="settings-input"
+                    style={{ maxWidth: 160 }}
+                    disabled={loading || saving || !emailEnabled}
+                  />
+                  <span className="tiny mut">minutes before activity starts or is due</span>
+                </div>
+
+                <span className="tiny mut" style={{ marginTop: 6 }}>
+                  {emailEnabled ? (
+                    <>Reminder emails will be sent to the assigned sales employee <b>{emailMinutes || 30} minutes</b> prior to scheduled calls, tasks, and meetings.</>
+                  ) : (
+                    <>Email reminders are currently disabled.</>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -746,14 +860,14 @@ function NotificationSettingsPanel() {
               color: '#FFFFFF',
               boxShadow: '0 4px 14px rgba(0, 201, 167, 0.35)',
             }}
-            disabled={saving || loading || !reminderMinutes || reminderMinutes < 1}
+            disabled={saving || loading || (notifEnabled && (!notifMinutes || notifMinutes < 1)) || (emailEnabled && (!emailMinutes || emailMinutes < 1))}
           >
             {saving ? 'Saving changes…' : 'Save changes ✓'}
           </button>
 
           {saved && (
             <span className="chip ok" style={{ padding: '6px 14px', fontSize: 12 }}>
-              ✓ Reminder timing saved
+              ✓ Notification preferences saved
             </span>
           )}
         </div>

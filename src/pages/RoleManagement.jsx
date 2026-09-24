@@ -9,14 +9,17 @@ const ACTION_LABELS = {
   create: 'Create',
   edit: 'Edit',
   delete: 'Delete',
-  approve: 'Approve',
-  export: 'Export',
-  import: 'Import',
 }
 // Fixed display order only — which of these actually show up as columns is
-// derived below from the real module list, not assumed. If nothing in this
-// backend ever supports e.g. Export, that column never renders at all.
-const ACTION_ORDER = ['view', 'create', 'edit', 'delete', 'approve', 'export', 'import']
+// derived below from the real module list, not assumed.
+const ACTION_ORDER = ['view', 'create', 'edit', 'delete']
+
+const DEFAULT_PRODUCT_GROUPS_MODULE = {
+  module_code: 'PRODUCT_GROUPS',
+  module_name: 'Product Groups Master',
+  description: 'Manage product categories and catalog grouping',
+  actions: ['view', 'create', 'edit', 'delete'],
+}
 
 const DEFAULT_UOMS_MODULE = {
   module_code: 'UOMS',
@@ -40,6 +43,7 @@ const DEFAULT_PRICE_LISTS_MODULE = {
 }
 
 const EXTRA_MASTER_MODULES = [
+  DEFAULT_PRODUCT_GROUPS_MODULE,
   DEFAULT_UOMS_MODULE,
   DEFAULT_CURRENCIES_MODULE,
   DEFAULT_PRICE_LISTS_MODULE,
@@ -49,8 +53,16 @@ const EXTRA_MASTER_MODULES = [
 // the server re-applies this floor on every save regardless of what gets
 // submitted, so these render as permanently on rather than let an admin
 // think they can uncheck them and then be surprised when they don't stay
-// off. Kept in sync by hand since it's a tiny, rarely-changed list.
-const COMPANY_ADMIN_LOCKED_MODULES = ['PRODUCTS', 'USER_MGMT', 'SETTINGS', 'ROLE_MGMT']
+const COMPANY_ADMIN_LOCKED_MODULES = [
+  'PRODUCTS',
+  'PRODUCT_GROUPS',
+  'UOMS',
+  'CURRENCIES',
+  'PRICE_LISTS',
+  'USER_MGMT',
+  'SETTINGS',
+  'ROLE_MGMT',
+]
 
 export default function RoleManagement() {
   const [roles, setRoles] = useState([])
@@ -226,7 +238,7 @@ export default function RoleManagement() {
 
             <div className="rowx sp" style={{ margin: '14px 0 10px', flexShrink: 0 }}>
               <span className="tiny">All Roles <b className="chip">{roles.length}</b></span>
-              <button className="btn pri" style={{ padding: '6px 12px' }} onClick={() => setShowNewRole((v) => !v)}>＋ Create New Role</button>
+              <button className="btn pri" style={{ padding: '6px 12px' }} onClick={() => { setNewRoleName(''); setShowNewRole((v) => !v) }}>＋ Create New Role</button>
             </div>
 
             {showNewRole && (

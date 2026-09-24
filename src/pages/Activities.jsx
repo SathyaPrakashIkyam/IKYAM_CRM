@@ -52,6 +52,25 @@ export default function Activities() {
       .catch((err) => console.error('Failed to load leads for activities:', err))
   }, [companyId])
 
+  // Every way of opening/closing the modal starts from a clean form, so
+  // nothing typed earlier (or left after Cancel / ✕ / clicking outside) reappears.
+  function resetNewForm() {
+    setForm({ activity_type: 'call', subject: '', due_at: '', lead_id: '' })
+    setAttendeeEmail('')
+    setNewAttachments([])
+    setFormError('')
+  }
+
+  function openNew() {
+    resetNewForm()
+    setShowNew(true)
+  }
+
+  function closeNew() {
+    setShowNew(false)
+    resetNewForm()
+  }
+
   async function createActivity(e) {
     e.preventDefault()
     setFormError('')
@@ -86,10 +105,7 @@ export default function Activities() {
         openActivityInProvider(activity, provider, attendeeEmail)
       }
 
-      setForm({ activity_type: 'call', subject: '', due_at: '', lead_id: '' })
-      setAttendeeEmail('')
-      setNewAttachments([])
-      setShowNew(false)
+      closeNew()
       load()
     } catch (err) {
       const detail = err?.response?.data?.detail
@@ -297,7 +313,7 @@ export default function Activities() {
                 Every call, task, and meeting — one unified queue across all records
               </div>
             </div>
-            <button className="btn pri activities-new-btn" onClick={() => setShowNew(true)}>
+            <button className="btn pri activities-new-btn" onClick={openNew}>
               ＋ New activity
             </button>
           </div>
@@ -364,10 +380,7 @@ export default function Activities() {
         {showNew && (
           <div
             className="lead-modal-overlay"
-            onClick={() => {
-              setShowNew(false)
-              setNewAttachments([])
-            }}
+            onClick={closeNew}
           >
             <div className="lead-modal-card activity-modal-dialog" onClick={(e) => e.stopPropagation()}>
               <div className="lead-modal-header">
@@ -381,10 +394,7 @@ export default function Activities() {
                 <button
                   type="button"
                   className="lead-modal-close"
-                  onClick={() => {
-                    setShowNew(false)
-                    setNewAttachments([])
-                  }}
+                  onClick={closeNew}
                 >✕</button>
               </div>
               <div className="title-bar" style={{ margin: '0 0 20px 0', width: 44, height: 3 }} />
@@ -557,11 +567,7 @@ export default function Activities() {
                   <button
                     type="button"
                     className="btn ghost lead-modal-cancel-btn"
-                    onClick={() => {
-                      setShowNew(false)
-                      setNewAttachments([])
-                      setFormError('')
-                    }}
+                    onClick={closeNew}
                   >
                     Cancel
                   </button>

@@ -70,6 +70,15 @@ export function AuthProvider({ children }) {
 
   function login(tokens) {
     storeAuth(tokens)
+    // Set the session's company right here, in the same tick as the token —
+    // otherwise the first screen after login mounts and fetches with whatever
+    // company id was left in localStorage (or none) before the sync effect
+    // below gets to run, and shows empty data until a manual refresh.
+    const activeId = tokens?.schema_id || tokens?.tenant_uuid
+    if (activeId) {
+      setCurrentCompanyId(activeId)
+      setCompanyId(activeId)
+    }
     setAuth(tokens)
   }
 

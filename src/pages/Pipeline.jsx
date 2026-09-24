@@ -109,6 +109,7 @@ export default function Pipeline() {
       (card.opportunity_no || '').toLowerCase().includes(q) ||
       (card.account_name || '').toLowerCase().includes(q) ||
       (card.owner_initials || '').toLowerCase().includes(q) ||
+      (card.description || '').toLowerCase().includes(q) ||
       (stageName || '').toLowerCase().includes(q) ||
       (card.amount ? String(card.amount) : '').includes(q) ||
       (card.id || '').toLowerCase().includes(q)
@@ -327,14 +328,36 @@ export default function Pipeline() {
                             </span>
                           )}
                           <b>{card.name}</b>
+                          {card.description && (
+                            <div
+                              className="tiny mut"
+                              title={card.description}
+                              style={{
+                                fontSize: 11,
+                                color: 'var(--mut)',
+                                marginTop: 2,
+                                marginBottom: 4,
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                lineHeight: 1.35
+                              }}
+                            >
+                              {card.description}
+                            </div>
+                          )}
                           <div className="amt">{card.amount ? `₹${Math.round(card.amount).toLocaleString('en-IN')}` : '—'}</div>
                           <div className="rowx sp" style={{ marginTop: 6 }}>
                             {dragCard?.id === card.id ? (
                               <span className="chip brand">dragging…</span>
-                            ) : (
+                            ) : card.account_name && card.account_name.trim().toLowerCase() !== (card.name || '').trim().toLowerCase() ? (
                               <span className="tiny" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: 100 }}>
                                 {card.account_name}
                               </span>
+                            ) : (
+                              <span />
                             )}
                             <div className="rowx" style={{ gap: 6 }}>
                               {dragCard?.id !== card.id && (card.win_probability ?? col.stage.default_probability) != null && (
@@ -406,7 +429,26 @@ export default function Pipeline() {
                             {card.opportunity_no || `O-${card.id.slice(0, 6)}`}
                           </span>
                         </td>
-                        <td><b>{card.name}</b></td>
+                        <td>
+                          <b>{card.name}</b>
+                          {card.description && (
+                            <div
+                              className="tiny mut"
+                              style={{
+                                fontSize: '11px',
+                                color: 'var(--mut)',
+                                maxWidth: 260,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                marginTop: 2
+                              }}
+                              title={card.description}
+                            >
+                              {card.description}
+                            </div>
+                          )}
+                        </td>
                         <td>{card.account_name || '—'}</td>
                         <td>
                           <span className="chip" style={{ background: 'rgba(0, 201, 167, 0.12)', color: 'var(--green-ink)' }}>

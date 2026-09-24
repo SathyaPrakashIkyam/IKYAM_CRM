@@ -53,6 +53,16 @@ export default function QuotesList() {
   const location = useLocation()
   const [quotes, setQuotes] = useState([])
   const [loading, setLoading] = useState(false)
+  const [accounts, setAccounts] = useState([])
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit] = useState(25)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [stats, setStats] = useState({
+    total_count: 0, total_value: 0, draft_count: 0, draft_value: 0,
+    approved_count: 0, approved_value: 0, sap_count: 0,
+  })
 
   // Filter States (Clean & optimized: no heavy account/product lists loaded)
   const [searchQuery, setSearchQuery] = useState('')
@@ -66,78 +76,65 @@ export default function QuotesList() {
 
   const { companyId } = useAuth()
 
-  function loadQuotes() {
+  // Debounce the search box so we don't hit the API on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchQuery])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, statusFilter, typeFilter, accountFilter])
+
+  useEffect(() => {
     if (!companyId) return
+    quotesApi.accounts(companyId).then(setAccounts).catch((e) => console.error('Failed to load quote accounts:', e))
+  }, [companyId])
+
+  // Filtering, pagination and KPIs are all computed by the backend
+  useEffect(() => {
+    if (!companyId) return
+    let cancelled = false
+    const filters = {
+      search: debouncedSearch || undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      quote_type: typeFilter !== 'all' ? typeFilter : undefined,
+      account_id: accountFilter !== 'all' ? accountFilter : undefined,
+    }
     setLoading(true)
-    quotesApi
-      .list(companyId)
-      .then((data) => {
-        setQuotes(Array.isArray(data) ? data : [])
+    Promise.all([
+      quotesApi.list(companyId, { page, limit, ...filters }),
+      quotesApi.stats(companyId, filters),
+    ])
+      .then(([res, s]) => {
+        if (cancelled) return
+        setQuotes(Array.isArray(res?.items) ? res.items : [])
+        setTotalCount(res?.total || 0)
+        setTotalPages(res?.total_pages || 1)
+        setStats(s)
       })
       .catch((e) => console.error('Failed to load quotes:', e))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(loadQuotes, [companyId])
-
-  // Multi-field search & category filtering
-  const filteredQuotes = useMemo(() => {
-    return quotes.filter((q) => {
-      // Status filter
-      if (statusFilter !== 'all' && q.status !== statusFilter && q.erp_sync_status !== statusFilter) return false
-
-      // Quote type filter
-      if (typeFilter !== 'all' && q.quote_type !== typeFilter) return false
-
-      // Account filter (arrived here from a specific deal/account)
-      if (accountFilter !== 'all' && q.account_id !== accountFilter) return false
-
-      // Search query
-      if (!searchQuery.trim()) return true
-      const s = searchQuery.toLowerCase().trim()
-      const lineMatch = (q.lines || []).some((l) => (l.description || '').toLowerCase().includes(s))
-
-      return (
-        (q.doc_num || '').toLowerCase().includes(s) ||
-        (q.account_name || '').toLowerCase().includes(s) ||
-        (q.quote_date || '').toLowerCase().includes(s) ||
-        (q.valid_until || '').toLowerCase().includes(s) ||
-        formatDateDisplay(q.quote_date).toLowerCase().includes(s) ||
-        formatDateDisplay(q.valid_until).toLowerCase().includes(s) ||
-        (q.status || '').toLowerCase().includes(s) ||
-        (q.erp_sync_status || '').toLowerCase().includes(s) ||
-        (q.quote_type || '').toLowerCase().includes(s) ||
-        `v-${q.revision || 1}`.toLowerCase().includes(s) ||
-        String(q.total || '').includes(s) ||
-        String(q.previous_total || '').includes(s) ||
-        lineMatch
-      )
-    })
-  }, [quotes, statusFilter, typeFilter, accountFilter, searchQuery])
-
-  // Built from the quotes actually loaded (each already carries
-  // account_id/account_name) — no separate accounts fetch needed just for
-  // this filter dropdown.
-  const accountOptions = useMemo(() => {
-    const seen = new Map()
-    for (const q of quotes) {
-      if (q.account_id && !seen.has(q.account_id)) {
-        seen.set(q.account_id, q.account_name || '—')
-      }
+      .finally(() => !cancelled && setLoading(false))
+    return () => {
+      cancelled = true
     }
-    return [{ value: 'all', label: 'All Accounts' }, ...Array.from(seen, ([value, label]) => ({ value, label }))]
-  }, [quotes])
+  }, [companyId, page, limit, debouncedSearch, statusFilter, typeFilter, accountFilter])
 
-  // Metric strip summary (reflects filtered quotes when opened from a specific deal/lead or filter)
-  const metrics = useMemo(() => {
-    const totalVal = filteredQuotes.reduce((sum, q) => sum + (q.total || 0), 0)
-    const draftQuotes = filteredQuotes.filter((q) => q.status === 'draft' || q.erp_sync_status === 'pending')
-    const draftVal = draftQuotes.reduce((sum, q) => sum + (q.total || 0), 0)
-    const approvedQuotes = filteredQuotes.filter((q) => q.status === 'approved' || q.erp_sync_status === 'synced')
-    const approvedVal = approvedQuotes.reduce((sum, q) => sum + (q.total || 0), 0)
-    const sapCount = filteredQuotes.filter((q) => q.quote_type === 'sap_b1').length
-    return { totalVal, draftVal, draftQuotes: draftQuotes.length, approvedVal, approvedQuotes: approvedQuotes.length, sapCount }
-  }, [filteredQuotes])
+  const filteredQuotes = quotes
+
+  const accountOptions = useMemo(
+    () => [{ value: 'all', label: 'All Accounts' }, ...accounts.map((a) => ({ value: a.id, label: a.name || '—' }))],
+    [accounts]
+  )
+
+  const metrics = {
+    totalVal: stats.total_value,
+    draftVal: stats.draft_value,
+    draftQuotes: stats.draft_count,
+    approvedVal: stats.approved_value,
+    approvedQuotes: stats.approved_count,
+    sapCount: stats.sap_count,
+  }
 
   return (
     <AppShell>
@@ -235,7 +232,7 @@ export default function QuotesList() {
           <div className="quotes-metric-col">
             <span className="quotes-metric-label">Total Quotes</span>
             <span className="quotes-metric-num">₹{formatINR(metrics.totalVal)}</span>
-            <span className="tiny mut">{filteredQuotes.length} total quotes</span>
+            <span className="tiny mut">{stats.total_count} total quotes</span>
           </div>
           <div className="quotes-metric-col">
             <span className="quotes-metric-label">Draft &amp; Pending</span>
@@ -381,6 +378,37 @@ export default function QuotesList() {
               )}
             </tbody>
           </table>
+
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderTop: '1px solid var(--border)' }}>
+              <span className="tiny mut font-semibold">
+                Showing {(page - 1) * limit + 1} - {Math.min(page * limit, totalCount)} of {totalCount} quotes
+              </span>
+              <div className="rowx" style={{ gap: 8, alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  style={{ padding: '5px 14px', fontSize: 13, borderRadius: 14 }}
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  ← Previous
+                </button>
+                <span className="tiny font-bold" style={{ padding: '0 6px', color: 'var(--ink)' }}>
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  style={{ padding: '5px 14px', fontSize: 13, borderRadius: 14 }}
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </AppShell>

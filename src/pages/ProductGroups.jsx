@@ -2,12 +2,26 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { productGroupsApi } from '../api/endpoints'
+import { useAuth } from '../context/AuthContext'
 import '../styles/ikyam-mock.css'
 import '../styles/Activities.css'
 import '../styles/Masters.css'
 
 export default function ProductGroups() {
   const navigate = useNavigate()
+  const { user, isCompanyAdmin, isSuperAdmin, can, permBypass } = useAuth()
+  const roleUpper = (user?.role || '').toUpperCase()
+  const isAdminLike =
+    isCompanyAdmin ||
+    isSuperAdmin ||
+    permBypass ||
+    roleUpper === 'ADMIN' ||
+    roleUpper.includes('ADMIN') ||
+    !!user?.is_admin
+
+  const canView = isAdminLike || can('PRODUCT_GROUPS', 'view') || can('MASTERS', 'view') || can('MASTER', 'view')
+  const canCreate = isAdminLike || can('PRODUCT_GROUPS', 'create') || can('MASTERS', 'create') || can('MASTER', 'create')
+
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -31,8 +45,10 @@ export default function ProductGroups() {
   }
 
   useEffect(() => {
-    load()
-  }, [])
+    if (canView) {
+      load()
+    }
+  }, [canView])
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -76,6 +92,23 @@ export default function ProductGroups() {
     })
   }, [groups, search])
 
+  if (!canView) {
+    return (
+      <AppShell>
+        <div className="ikyam-mock masters-page" style={{ padding: 48, textAlign: 'center' }}>
+          <div style={{ fontSize: 56, marginBottom: 14 }}>🔒</div>
+          <h2 style={{ font: '800 22px var(--d)', color: 'var(--ink)' }}>Access Restricted</h2>
+          <p className="tiny mut" style={{ maxWidth: 440, margin: '10px auto 22px', fontSize: 13, lineHeight: 1.5 }}>
+            You do not have permission to view Product Groups. Please contact your company administrator to grant you the <b>PRODUCT_GROUPS</b> View permission.
+          </p>
+          <button className="btn pri" style={{ padding: '8px 24px', borderRadius: 20 }} onClick={() => navigate('/today')}>
+            Go to Home
+          </button>
+        </div>
+      </AppShell>
+    )
+  }
+
   return (
     <AppShell>
       <div className="ikyam-mock masters-page">
@@ -97,34 +130,42 @@ export default function ProductGroups() {
 
         {/* Masters Navigation Tabs */}
         <div className="masters-nav-tabs">
-          <button
-            type="button"
-            className="actchip on"
-            onClick={() => navigate('/product-groups')}
-          >
-            📁 Product Groups
-          </button>
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/uoms')}
-          >
-            📏 Units of Measure
-          </button>
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/currencies')}
-          >
-            💱 Currencies
-          </button>
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/price-lists')}
-          >
-            💰 Price Lists
-          </button>
+          {(isAdminLike || can('PRODUCT_GROUPS', 'view')) && (
+            <button
+              type="button"
+              className="actchip on"
+              onClick={() => navigate('/product-groups')}
+            >
+              📁 Product Groups
+            </button>
+          )}
+          {(isAdminLike || can('UOMS', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/uoms')}
+            >
+              📏 Units of Measure
+            </button>
+          )}
+          {(isAdminLike || can('CURRENCIES', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/currencies')}
+            >
+              💱 Currencies
+            </button>
+          )}
+          {(isAdminLike || can('PRICE_LISTS', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/price-lists')}
+            >
+              💰 Price Lists
+            </button>
+          )}
         </div>
 
         {/* Metrics Strip */}
@@ -142,7 +183,7 @@ export default function ProductGroups() {
           <div className="masters-metric-col">
             <span className="masters-metric-label">Access Level</span>
             <span className="masters-metric-num" style={{ fontSize: 14, marginTop: 7, color: 'var(--mut)' }}>
-              🔒 Company Admin Master
+              {isAdminLike ? '🔒 Company Admin Master' : canCreate ? 'Full Access' : 'View Only'}
             </span>
           </div>
         </div>
@@ -171,7 +212,8 @@ export default function ProductGroups() {
             )}
           </div>
 
-             <button
+          {canCreate && (
+            <button
               className="btn pri"
               style={{
                 borderRadius: 24,
@@ -190,6 +232,7 @@ export default function ProductGroups() {
             >
               ＋ New product group
             </button>
+          )}
         </div>
 
         {error && (

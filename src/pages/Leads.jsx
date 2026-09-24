@@ -14,6 +14,21 @@ const PRIORITY_OPTIONS = [
   { value: 'Cold', label: '❄️ Cold' },
 ]
 
+const SOURCE_SHORT_LABELS = {
+  manual: 'Manual',
+  web: 'Web',
+  referral: 'Referral',
+  event: 'Event',
+  partner: 'Partner',
+  other: 'Other',
+}
+
+function formatSource(source, sourceOther) {
+  if (!source) return ''
+  if (source.toLowerCase() === 'other' && sourceOther) return sourceOther
+  return SOURCE_SHORT_LABELS[source.toLowerCase()] || (source.charAt(0).toUpperCase() + source.slice(1))
+}
+
 // Completion percentage: red < 50, yellow 50–99, green = 100
 function completionColor(pct) {
   if (pct >= 100) return '#1f9d55' // green
@@ -379,7 +394,7 @@ export default function Leads() {
                           {lead.designation && <span className="tiny mut" style={{ fontWeight: 500 }}>({lead.designation})</span>}
                         </div>
                         <div className="tiny" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                          <span>{lead.source}</span>
+                          <span>{formatSource(lead.source, lead.source_other)}</span>
                           {lead.priority && (
                             <span className={`lead-priority-badge ${(lead.priority || '').toLowerCase()}`}>
                               {lead.priority === 'Hot' ? '🔥 Hot' : lead.priority === 'Warm' ? '⚡ Warm' : '❄️ Cold'}
@@ -409,7 +424,7 @@ export default function Leads() {
                         )}
                       </div>
                       <div className="tiny" style={{ marginTop: 2 }}>
-                        {selected.lead_no} · {selected.designation ? `${selected.designation} · ` : ''}{selected.source} · {selected.company_name || 'no company on file'}
+                        {selected.lead_no} · {selected.designation ? `${selected.designation} · ` : ''}{formatSource(selected.source, selected.source_other)} · {selected.company_name || 'no company on file'}
                       </div>
                     </div>
                     <div className="rowx">

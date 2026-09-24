@@ -121,7 +121,9 @@ export const opportunitiesApi = {
 }
 
 export const quotesApi = {
-  list: (companyId) => api.get('/quotes', { params: { company_id: companyId } }).then((r) => r.data),
+  list: (companyId, params = {}) => api.get('/quotes', { params: { company_id: companyId, ...params } }).then((r) => r.data),
+  stats: (companyId, params = {}) => api.get('/quotes/meta/stats', { params: { company_id: companyId, ...params } }).then((r) => r.data),
+  accounts: (companyId) => api.get('/quotes/meta/accounts', { params: { company_id: companyId } }).then((r) => r.data),
   create: (companyId, body) => api.post('/quotes', body, { params: { company_id: companyId } }).then((r) => r.data),
   update: (companyId, id, body) => api.patch(`/quotes/${id}`, body, { params: { company_id: companyId } }).then((r) => r?.data || r),
   get: (id, companyId) => api.get(`/quotes/${id}`, { params: companyId ? { company_id: companyId } : {} }).then((r) => r.data),
@@ -148,11 +150,17 @@ export const currenciesApi = {
 }
 
 export const productsApi = {
-  list: (companyId) => api.get('/products', { params: { company_id: companyId } }).then((r) => r.data),
+  list: (companyId, params = {}) =>
+    api.get('/products', { params: { company_id: companyId, ...params } }).then((r) => r.data),
   create: (companyId, body) => api.post('/products', body, { params: { company_id: companyId } }).then((r) => r.data),
   get: (id) => api.get(`/products/${id}`).then((r) => r.data),
   update: (id, body) => api.patch(`/products/${id}`, body).then((r) => r.data),
+  stats: (companyId) => api.get('/products/meta/stats', { params: { company_id: companyId } }).then((r) => r.data),
   companySource: () => api.get('/products/meta/company-source').then((r) => r.data.source),
+}
+
+export const searchApi = {
+  search: (companyId, q) => api.get('/search', { params: { company_id: companyId, q } }).then((r) => r.data),
 }
 
 export const priceListsApi = {

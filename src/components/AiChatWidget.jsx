@@ -127,7 +127,7 @@ export default function AiChatWidget() {
           })
         } else if (data.type === 'done') {
           setStreaming(false)
-          setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, streaming: false } : m)))
+          setMessages((prev) => prev.map((m) => ({ ...m, streaming: false })))
           // Only the business-card lead flow sets this — a real yes/no
           // confirmation, not free-form LLM text, so it's safe to render as
           // actual buttons instead of making the user type a reply.
@@ -135,7 +135,7 @@ export default function AiChatWidget() {
         } else if (data.type === 'error') {
           setStreaming(false)
           setAwaitingConfirm(false)
-          setMessages((prev) => [...prev, { role: 'system', content: data.message }])
+          setMessages((prev) => [...prev.map((m) => ({ ...m, streaming: false })), { role: 'system', content: data.message }])
         }
       }
     }
@@ -165,7 +165,8 @@ export default function AiChatWidget() {
   function send() {
     const text = input.trim()
     if (!text || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
-    setMessages((prev) => [...prev, { role: 'user', content: text }])
+    setStreaming(false)
+    setMessages((prev) => [...prev.map((m) => ({ ...m, streaming: false })), { role: 'user', content: text }])
     wsRef.current.send(JSON.stringify({ message: text }))
     setInput('')
     setAwaitingConfirm(false)
@@ -177,7 +178,8 @@ export default function AiChatWidget() {
   // just via a button tap instead of typing it.
   function sendConfirm(answer) {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
-    setMessages((prev) => [...prev, { role: 'user', content: answer === 'yes' ? 'Yes' : 'No' }])
+    setStreaming(false)
+    setMessages((prev) => [...prev.map((m) => ({ ...m, streaming: false })), { role: 'user', content: answer === 'yes' ? 'Yes' : 'No' }])
     wsRef.current.send(JSON.stringify({ message: answer }))
     setAwaitingConfirm(false)
     setWaitingForReply(true)
@@ -203,7 +205,8 @@ export default function AiChatWidget() {
       // just the base64 payload, not the data: URL wrapper.
       const base64 = String(reader.result).split(',')[1] || ''
       if (!base64) return
-      setMessages((prev) => [...prev, { role: 'user', content: '', imagePreview: String(reader.result) }])
+      setStreaming(false)
+      setMessages((prev) => [...prev.map((m) => ({ ...m, streaming: false })), { role: 'user', content: '', imagePreview: String(reader.result) }])
       wsRef.current.send(JSON.stringify({ image_base64: base64, image_mime_type: file.type || 'image/jpeg' }))
       setAwaitingConfirm(false)
       setWaitingForReply(true)
@@ -215,6 +218,7 @@ export default function AiChatWidget() {
     sessionIdRef.current = newSessionId()
     sessionStorage.setItem('ikyam_ai_session', sessionIdRef.current)
     setMessages([])
+    setStreaming(false)
     setAwaitingConfirm(false)
     setWaitingForReply(false)
     wsRef.current?.close()
@@ -250,7 +254,6 @@ export default function AiChatWidget() {
                 {m.content && (m.role === 'user' ? m.content : stripMarkdown(m.content)).split('\n').map((line, li) => (
                   <div key={li}>{line}</div>
                 ))}
-                {m.streaming && <span className="ai-chat-cursor">▍</span>}
               </div>
             ))}
             {waitingForReply && (

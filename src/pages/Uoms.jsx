@@ -118,34 +118,42 @@ export default function Uoms() {
 
         {/* Masters Navigation Tabs */}
         <div className="masters-nav-tabs">
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/product-groups')}
-          >
-            📁 Product Groups
-          </button>
-          <button
-            type="button"
-            className="actchip on"
-            onClick={() => navigate('/uoms')}
-          >
-            📏 Units of Measure
-          </button>
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/currencies')}
-          >
-            💱 Currencies
-          </button>
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/price-lists')}
-          >
-            💰 Price Lists
-          </button>
+          {(isCompanyAdmin || isSuperAdmin || can('PRODUCT_GROUPS', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/product-groups')}
+            >
+              📁 Product Groups
+            </button>
+          )}
+          {(isCompanyAdmin || isSuperAdmin || can('UOMS', 'view')) && (
+            <button
+              type="button"
+              className="actchip on"
+              onClick={() => navigate('/uoms')}
+            >
+              📏 Units of Measure
+            </button>
+          )}
+          {(isCompanyAdmin || isSuperAdmin || can('CURRENCIES', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/currencies')}
+            >
+              💱 Currencies
+            </button>
+          )}
+          {(isCompanyAdmin || isSuperAdmin || can('PRICE_LISTS', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/price-lists')}
+            >
+              💰 Price Lists
+            </button>
+          )}
         </div>
 
         {/* Metrics Strip */}

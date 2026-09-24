@@ -346,41 +346,51 @@ export default function ProductPriceList() {
 
         {/* Masters Navigation Tabs */}
         <div className="masters-nav-tabs">
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/product-groups')}
-          >
-            📁 Product Groups
-          </button>
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/uoms')}
-          >
-            📏 Units of Measure
-          </button>
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/currencies')}
-          >
-            💱 Currencies
-          </button>
-          <button
-            type="button"
-            className="actchip on"
-            onClick={() => navigate('/price-lists')}
-          >
-            💰 Price Lists
-          </button>
-          <button
-            type="button"
-            className="actchip"
-            onClick={() => navigate('/products')}
-          >
-            📦 Products
-          </button>
+          {(isCompanyAdmin || isSuperAdmin || can('PRODUCT_GROUPS', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/product-groups')}
+            >
+              📁 Product Groups
+            </button>
+          )}
+          {(isCompanyAdmin || isSuperAdmin || can('UOMS', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/uoms')}
+            >
+              📏 Units of Measure
+            </button>
+          )}
+          {(isCompanyAdmin || isSuperAdmin || can('CURRENCIES', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/currencies')}
+            >
+              💱 Currencies
+            </button>
+          )}
+          {(isCompanyAdmin || isSuperAdmin || can('PRICE_LISTS', 'view')) && (
+            <button
+              type="button"
+              className="actchip on"
+              onClick={() => navigate('/price-lists')}
+            >
+              💰 Price Lists
+            </button>
+          )}
+          {(isCompanyAdmin || isSuperAdmin || can('PRODUCTS', 'view')) && (
+            <button
+              type="button"
+              className="actchip"
+              onClick={() => navigate('/products')}
+            >
+              📦 Products
+            </button>
+          )}
         </div>
 
         {/* Metrics Strip */}
@@ -451,6 +461,7 @@ export default function ProductPriceList() {
                     setPlForm({ name: '', currency: currencies[0]?.code || 'INR' })
                     setPlModalError(null)
                     setShowNewCurrency(false)
+                    setNewCurrencyCode('')
                     setShowNewPriceList(true)
                   }}
                 >

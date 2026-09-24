@@ -60,15 +60,24 @@ function PipelineMixDonut({ slices, total }) {
 function Funnel({ steps }) {
   const max = Math.max(1, ...steps.map((s) => s.count))
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {steps.map((s) => (
-        <div key={s.label} className="dash-funnel-row">
-          <div className="dash-funnel-bar" style={{ width: `${Math.max(6, Math.round((s.count / max) * 100))}%` }}>
-            <span>{s.label}</span>
+    <div className="dash-funnel-list">
+      {steps.map((s) => {
+        const pct = max > 0 ? Math.round((s.count / max) * 100) : 0
+        return (
+          <div key={s.label} className="dash-funnel-track" title={`${s.label}: ${s.count}`}>
+            {pct > 0 && (
+              <div
+                className="dash-funnel-fill"
+                style={{ width: `${pct}%` }}
+              />
+            )}
+            <div className="dash-funnel-content">
+              <span className="dash-funnel-label">{s.label}</span>
+              <span className="dash-funnel-count">{s.count}</span>
+            </div>
           </div>
-          <b className="tiny">{s.count}</b>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

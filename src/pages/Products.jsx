@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import AppShell from '../components/AppShell'
 import CustomSelect from '../components/CustomSelect'
 import { productsApi, productGroupsApi, uomsApi } from '../api/endpoints'
@@ -46,22 +46,62 @@ export default function Products() {
   const [newUomCode, setNewUomCode] = useState('')
   const [form, setForm] = useState(EMPTY_PRODUCT)
 
-  // Filters state
+  // Filters & Pagination state
   const [searchQuery, setSearchQuery] = useState('')
   const [groupFilter, setGroupFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
   const [sellableFilter, setSellableFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(25)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [stats, setStats] = useState({ total: 0, sellable: 0, sap_b1: 0, groups: 0 })
 
-
-function loadCatalog() {
+  function loadCatalog() {
     if (!companyId) return
-    productsApi.list(companyId).then(setProducts).catch((e) => console.error('Failed to load products:', e))
+    setLoading(true)
+
+    let is_sellable = undefined
+    let is_active = undefined
+    if (sellableFilter === 'sellable') is_sellable = true
+    else if (sellableFilter === 'non_sellable') is_sellable = false
+    else if (sellableFilter === 'active') is_active = true
+    else if (sellableFilter === 'inactive') is_active = false
+
+    productsApi
+      .list(companyId, {
+        page,
+        limit,
+        search: searchQuery.trim() || undefined,
+        product_group_id: groupFilter !== 'all' ? groupFilter : undefined,
+        source: sourceFilter !== 'all' ? sourceFilter : undefined,
+        is_sellable,
+        is_active,
+      })
+      .then((res) => {
+        if (res && Array.isArray(res.items)) {
+          setProducts(res.items)
+          setTotalCount(res.total || 0)
+          setTotalPages(res.total_pages || 1)
+        } else if (Array.isArray(res)) {
+          setProducts(res)
+          setTotalCount(res.length)
+          setTotalPages(1)
+        }
+      })
+      .catch((e) => console.error('Failed to load products:', e))
+      .finally(() => setLoading(false))
+
     productGroupsApi.list().then(setGroups).catch((e) => console.error('Failed to load product groups:', e))
     uomsApi.list().then(setUoms).catch((e) => console.error('Failed to load UOMs:', e))
     productsApi.companySource().then(setCompanySource).catch(() => {})
+    productsApi.stats(companyId).then(setStats).catch((e) => console.error('Failed to load product stats:', e))
   }
 
-  useEffect(loadCatalog, [companyId])
+  useEffect(() => {
+    loadCatalog()
+  }, [companyId, page, limit, searchQuery, groupFilter, sourceFilter, sellableFilter])
 
   async function createGroup(e) {
     e.preventDefault()
@@ -118,13 +158,6 @@ function loadCatalog() {
           ? `${missing[0]} is mandatory.`
           : `Please fill in all mandatory fields: ${missing.join(', ')}.`
       )
-      return
-    }
-
-    // Pre-check for duplicate SKU locally
-    if (products.some((p) => (p.sku || '').toLowerCase() === trimmedSku.toLowerCase())) {
-      setFieldErrors({ sku: true })
-      setModalError(`A product with SKU "${trimmedSku}" already exists.`)
       return
     }
 
@@ -212,16 +245,6 @@ function loadCatalog() {
       return
     }
 
-    // Pre-check for duplicate SKU locally on other products
-    if (
-      trimmedSku.toLowerCase() !== (editingProduct.sku || '').toLowerCase() &&
-      products.some((p) => p.id !== editingProduct.id && (p.sku || '').toLowerCase() === trimmedSku.toLowerCase())
-    ) {
-      setEditFieldErrors({ sku: true })
-      setEditModalError(`A product with SKU "${trimmedSku}" already exists.`)
-      return
-    }
-
     setEditSubmitting(true)
     setEditModalError(null)
     setEditFieldErrors({})
@@ -251,43 +274,14 @@ function loadCatalog() {
   }
 
 
-  // Filtered Products logic
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      // Group filter
-      if (groupFilter !== 'all' && p.product_group_id !== groupFilter) return false
-
-      // Source filter
-      if (sourceFilter !== 'all' && p.source !== sourceFilter) return false
-
-      // Sellable filter
-      if (sellableFilter === 'sellable' && !p.is_sellable) return false
-      if (sellableFilter === 'non_sellable' && p.is_sellable) return false
-      if (sellableFilter === 'active' && !p.is_active) return false
-      if (sellableFilter === 'inactive' && p.is_active) return false
-
-      // Search query
-      if (!searchQuery.trim()) return true
-      const q = searchQuery.toLowerCase().trim()
-      return (
-        (p.sku || '').toLowerCase().includes(q) ||
-        (p.name || '').toLowerCase().includes(q) ||
-        (p.description || '').toLowerCase().includes(q) ||
-        (p.product_group_name || '').toLowerCase().includes(q) ||
-        (p.uom || '').toLowerCase().includes(q) ||
-        (p.erp_item_code || '').toLowerCase().includes(q)
-      )
-    })
-  }, [products, groupFilter, sourceFilter, sellableFilter, searchQuery])
-
-  // Summary Metrics
-  const metrics = useMemo(() => {
-    const total = products.length
-    const sellable = products.filter((p) => p.is_sellable).length
-    const sapCount = products.filter((p) => p.source === 'sap_b1').length
-    const groupsCount = groups.length
-    return { total, sellable, sapCount, groupsCount }
-  }, [products, groups])
+  // Rows are already filtered/paginated by the backend; KPIs come from /products/meta/stats
+  const filteredProducts = products
+  const metrics = {
+    total: stats.total,
+    sellable: stats.sellable,
+    sapCount: stats.sap_b1,
+    groupsCount: stats.groups,
+  }
 
   return (
     <AppShell>
@@ -318,11 +312,17 @@ function loadCatalog() {
                     type="text"
                     placeholder="Search by product name, SKU, group, UOM..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setPage(1)
+                    }}
                     className="products-search-input"
                   />
                   {searchQuery && (
-                    <button type="button" style={{ border: 0, background: 'transparent', color: 'var(--mut)', cursor: 'pointer', fontSize: 11 }} onClick={() => setSearchQuery('')}>✕</button>
+                    <button type="button" style={{ border: 0, background: 'transparent', color: 'var(--mut)', cursor: 'pointer', fontSize: 11 }} onClick={() => {
+                      setSearchQuery('')
+                      setPage(1)
+                    }}>✕</button>
                   )}
                 </div>
 
@@ -335,7 +335,10 @@ function loadCatalog() {
                       ...groups.map((g) => ({ value: g.id, label: g.name })),
                     ]}
                     value={groupFilter}
-                    onChange={setGroupFilter}
+                    onChange={(val) => {
+                      setGroupFilter(val)
+                      setPage(1)
+                    }}
                     style={{ minWidth: 140 }}
                   />
                 </div>
@@ -350,7 +353,10 @@ function loadCatalog() {
                       { value: 'sap_b1', label: 'SAP B1' },
                     ]}
                     value={sourceFilter}
-                    onChange={setSourceFilter}
+                    onChange={(val) => {
+                      setSourceFilter(val)
+                      setPage(1)
+                    }}
                     style={{ minWidth: 130 }}
                   />
                 </div>
@@ -367,7 +373,10 @@ function loadCatalog() {
                       { value: 'inactive', label: 'Inactive Only' },
                     ]}
                     value={sellableFilter}
-                    onChange={setSellableFilter}
+                    onChange={(val) => {
+                      setSellableFilter(val)
+                      setPage(1)
+                    }}
                     style={{ minWidth: 135 }}
                   />
                 </div>
@@ -388,6 +397,10 @@ function loadCatalog() {
                     setForm(EMPTY_PRODUCT)
                     setModalError(null)
                     setFieldErrors({})
+                    setShowNewGroup(false)
+                    setNewGroupName('')
+                    setShowNewUom(false)
+                    setNewUomCode('')
                     setShowNewProduct(true)
                   }}
                 >
@@ -523,6 +536,38 @@ function loadCatalog() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Footer */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderTop: '1px solid var(--border)' }}>
+                  <span className="tiny mut font-semibold">
+                    Showing {(page - 1) * limit + 1} - {Math.min(page * limit, totalCount)} of {totalCount} products
+                  </span>
+                  <div className="rowx" style={{ gap: 8, alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      style={{ padding: '5px 14px', fontSize: 13, borderRadius: 14 }}
+                      disabled={page <= 1 || loading}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      ← Previous
+                    </button>
+                    <span className="tiny font-bold" style={{ padding: '0 6px', color: 'var(--ink)' }}>
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      style={{ padding: '5px 14px', fontSize: 13, borderRadius: 14 }}
+                      disabled={page >= totalPages || loading}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Centered Frosted Glass "Add New Product" Modal */}

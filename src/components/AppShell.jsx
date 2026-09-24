@@ -1,16 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import ikyamLogo from '../assets/ikyam-relatepro-logo.png'
 import ikyamLogoDark from '../assets/Ikyam_RelatePro_WH_BG.png'
-import { notificationsApi, leadsApi, accountsApi, contactsApi, quotesApi, reportsApi } from '../api/endpoints'
+import { notificationsApi, searchApi } from '../api/endpoints'
 import { WS_BASE_URL, getAuthToken } from '../api/client'
 import AiChatWidget from './AiChatWidget'
 import '../styles/ikyam-mock.css'
-
-function matchesQuery(haystacks, q) {
-  return haystacks.some((h) => h && String(h).toLowerCase().includes(q))
-}
 
 // One real nav list for every non-Super-Admin role — `module` is the exact
 // Role Management module_code that gates it. `module: null` means "always
@@ -41,7 +37,7 @@ const ALL_NAV_ITEMS = [
     icon: '🗂',
     adminOnly: false,
     children: [
-      { to: '/product-groups', label: 'Product Groups', icon: '📁' },
+      { to: '/product-groups', label: 'Product Groups', icon: '📁', module: 'PRODUCT_GROUPS' },
       { to: '/uoms', label: 'Units of Measure', icon: '📏', module: 'UOMS' },
       { to: '/currencies', label: 'Currencies', icon: '💱', module: 'CURRENCIES' },
       { to: '/price-lists', label: 'Price Lists', icon: '💰', module: 'PRICE_LISTS' },
@@ -87,7 +83,7 @@ export default function AppShell({ children, aiPanel }) {
     isAdminLike ||
     can('MASTERS', 'view') ||
     can('MASTER', 'view') ||
-    can('PRODUCTS', 'view') ||
+    can('PRODUCT_GROUPS', 'view') ||
     can('UOMS', 'view') ||
     can('CURRENCIES', 'view') ||
     can('PRICE_LISTS', 'view')
@@ -113,33 +109,36 @@ export default function AppShell({ children, aiPanel }) {
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
 
-  // Global search: fetch each searchable module's list once (only for modules
-  // this user can view), then filter client-side as they type. Avoids an API
-  // round-trip per keystroke while still searching real, current records.
+  // Global search: one backend call (GET /search) that returns matches from
+  // every module this user can view, debounced while they type.
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [searchData, setSearchData] = useState({ leads: [], accounts: [], contacts: [], quotes: [], reports: [] })
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
   const searchBoxRef = useRef(null)
   const notifBoxRef = useRef(null)
 
-  const [searchLoaded, setSearchLoaded] = useState(false)
-  const searchLoadingRef = useRef(false)
-
-  function fetchSearchData() {
-    if (searchLoadingRef.current || searchLoaded || !companyId || isSuperAdmin) return
-    searchLoadingRef.current = true
-    setSearchLoaded(true)
-    if (can('LEADS', 'view')) leadsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, leads: d }))).catch(() => {})
-    if (can('ACCOUNTS', 'view')) accountsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, accounts: d }))).catch(() => {})
-    if (can('CONTACTS', 'view')) contactsApi.list(companyId).then((d) => setSearchData((s) => ({ ...s, contacts: d }))).catch(() => {})
-  }
-
-  // Trigger search data fetch only when search query is entered
   useEffect(() => {
-    if (searchQuery.trim()) {
-      fetchSearchData()
+    const q = searchQuery.trim()
+    if (!q || !companyId || isSuperAdmin) {
+      setSearchResults([])
+      setSearchLoading(false)
+      return
     }
-  }, [searchQuery])
+    let cancelled = false
+    setSearchLoading(true)
+    const t = setTimeout(() => {
+      searchApi
+        .search(companyId, q)
+        .then((res) => !cancelled && setSearchResults(res?.groups || []))
+        .catch(() => !cancelled && setSearchResults([]))
+        .finally(() => !cancelled && setSearchLoading(false))
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [searchQuery, companyId, isSuperAdmin])
 
   useEffect(() => {
     if (!searchOpen) return
@@ -150,50 +149,24 @@ export default function AppShell({ children, aiPanel }) {
     return () => document.removeEventListener('mousedown', close)
   }, [searchOpen])
 
-  const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return []
-    const groups = []
-
-    const leadMatches = searchData.leads
-      .filter((l) => matchesQuery([l.name, l.lead_no, l.company_name, l.email, l.phone], q))
-      .slice(0, 5)
-      .map((l) => ({ id: l.id, title: l.name, subtitle: `${l.lead_no} · ${l.company_name || 'no company'}`, to: '/leads' }))
-    if (leadMatches.length) groups.push({ label: 'Leads', items: leadMatches })
-
-    const accountMatches = searchData.accounts
-      .filter((a) => matchesQuery([a.name, a.account_no, a.industry, a.phone], q))
-      .slice(0, 5)
-      .map((a) => ({ id: a.id, title: a.name, subtitle: a.industry || a.account_no, to: '/accounts' }))
-    if (accountMatches.length) groups.push({ label: 'Accounts', items: accountMatches })
-
-    const contactMatches = searchData.contacts
-      .filter((c) => matchesQuery([c.first_name, c.last_name, c.title, c.primary_email, c.primary_phone], q))
-      .slice(0, 5)
-      .map((c) => ({ id: c.id, title: c.first_name ? `${c.first_name} ${c.last_name}` : c.last_name, subtitle: c.title || c.primary_email || '—', to: '/contacts' }))
-    if (contactMatches.length) groups.push({ label: 'Contacts', items: contactMatches })
-
-    const quoteMatches = searchData.quotes
-      .filter((qt) => matchesQuery([qt.quote_no, qt.name, qt.status], q))
-      .slice(0, 5)
-      .map((qt) => ({ id: qt.id, title: qt.quote_no || qt.name, subtitle: qt.status || '—', to: `/quotesDetails/${qt.id}` }))
-    if (quoteMatches.length) groups.push({ label: 'Quotes', items: quoteMatches })
-
-    const reportMatches = (searchData.reports || [])
-      .filter((r) => matchesQuery([r.name, r.report_type], q))
-      .slice(0, 5)
-      .map((r) => ({ id: r.id, title: r.name, subtitle: r.report_type || 'Saved report', to: '/reports' }))
-    if (reportMatches.length) groups.push({ label: 'Reports', items: reportMatches })
-
-    return groups
-  }, [searchQuery, searchData])
-
   const hasSearchResults = searchResults.some((g) => g.items.length)
+
+  const SEARCH_ROUTES = {
+    lead: () => '/leads',
+    account: () => '/accounts',
+    contact: () => '/contacts',
+    quote: (id) => `/quotesDetails/${id}`,
+    opportunity: (id) => `/record/${id}`,
+    activity: () => '/activities',
+    price_list: () => '/price-lists',
+    product: () => '/products',
+    report: () => '/reports',
+  }
 
   function goToSearchResult(item) {
     setSearchOpen(false)
     setSearchQuery('')
-    navigate(item.to, { state: { openId: item.id } })
+    navigate((SEARCH_ROUTES[item.type] || (() => '/'))(item.id), { state: { openId: item.id } })
   }
 
   // Every role now shares the same Ikyam mockup palette on the shell — super
@@ -303,9 +276,21 @@ export default function AppShell({ children, aiPanel }) {
         { to: '/onboarding', label: 'Onboarding', icon: '➕' },
       ]
     : withProductsNextTo(
-        ALL_NAV_ITEMS.filter((item) => {
-          // If Masters: show only if user has access to masters
-          if (item.to === '/masters') return hasMastersAccess
+        ALL_NAV_ITEMS.map((item) => {
+          if (item.children) {
+            const visibleChildren = item.children.filter((child) => {
+              if (child.adminOnly && !isAdminLike) return false
+              if (child.module && !can(child.module, 'view') && !isAdminLike) return false
+              return true
+            })
+            return { ...item, children: visibleChildren }
+          }
+          return item
+        }).filter((item) => {
+          // If Masters: show only if user has access to masters AND has at least 1 visible child
+          if (item.to === '/masters') {
+            return hasMastersAccess && item.children && item.children.length > 0
+          }
 
           // If top-level Products: hide completely if user has access to masters
           // (since Products is accessible inside Masters). Otherwise show if role has PRODUCTS view permission.
@@ -516,16 +501,12 @@ export default function AppShell({ children, aiPanel }) {
               onChange={(e) => {
                 setSearchQuery(e.target.value)
                 setSearchOpen(true)
-                if (e.target.value.trim()) fetchSearchData()
               }}
               onFocus={() => {
-                if (searchQuery.trim()) {
-                  setSearchOpen(true)
-                  fetchSearchData()
-                }
+                if (searchQuery.trim()) setSearchOpen(true)
               }}
               onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); e.target.blur() } }}
-              placeholder="Search leads, accounts and quotes"
+              placeholder="Search leads, deals, accounts, contacts, quotes, activities, products..."
               style={{
                 flex: 1, border: 'none', outline: 'none', background: 'transparent',
                 fontSize: 13, color: 'var(--ink)', font: '500 13px var(--b, inherit)',
@@ -544,8 +525,11 @@ export default function AppShell({ children, aiPanel }) {
             )}
 
             {searchOpen && searchQuery && (
-              <div className="topbar-search-dropdown">
-                {!hasSearchResults && (
+              <div className="topbar-search-dropdown" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                {searchLoading && !hasSearchResults && (
+                  <div className="tiny mut" style={{ padding: '10px 8px' }}>Searching…</div>
+                )}
+                {!searchLoading && !hasSearchResults && (
                   <div className="tiny mut" style={{ padding: '10px 8px' }}>No matches for "{searchQuery}".</div>
                 )}
                 {searchResults.map((group) => (

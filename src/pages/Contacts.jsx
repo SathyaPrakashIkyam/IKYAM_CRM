@@ -413,12 +413,11 @@ export default function Contacts() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                       <label className="contact-modal-label" style={{ marginBottom: 0 }}>Lead – Company</label>
                       {isCompanyLocked && (
-                        <span className="contact-locked-tag">
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 4, display: 'inline-block', verticalAlign: '-1px' }}>
+                        <span className="contact-locked-tag" title="Locked to company" style={{ padding: '3px 6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                           </svg>
-                          Locked to company
                         </span>
                       )}
                     </div>

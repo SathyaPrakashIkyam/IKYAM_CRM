@@ -99,6 +99,12 @@ export default function QuotesDetails() {
   const [pickerGroupFilter, setPickerGroupFilter] = useState('all')
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [pickerSelectedIds, setPickerSelectedIds] = useState([])
+  const [pickerSelectedMap, setPickerSelectedMap] = useState({})
+  const [pickerProducts, setPickerProducts] = useState([])
+  const [pickerTotal, setPickerTotal] = useState(0)
+  const [pickerPage, setPickerPage] = useState(1)
+  const [pickerTotalPages, setPickerTotalPages] = useState(1)
+  const [pickerLoading, setPickerLoading] = useState(false)
 
   // Line item inline editing & 3-dots action menu
   const [focusedCell, setFocusedCell] = useState(null)
@@ -484,28 +490,37 @@ export default function QuotesDetails() {
     }
   }
 
-  // Fast Product Picker search (Capped at 80 for instant performance with 10,000+ items)
-  const filteredPickerProducts = useMemo(() => {
-    const q = pickerSearch.trim().toLowerCase()
-    const results = []
-    for (let i = 0; i < products.length; i++) {
-      const p = products[i]
-      if (pickerGroupFilter !== 'all' && p.product_group_id !== pickerGroupFilter) {
-        continue
-      }
-      if (q) {
-        const sku = (p.sku || '').toLowerCase()
-        const name = (p.name || '').toLowerCase()
-        const erp = (p.erp_item_code || '').toLowerCase()
-        if (!sku.includes(q) && !name.includes(q) && !erp.includes(q)) {
-          continue
+  // Query products with pricing directly joined from database
+  useEffect(() => {
+    if (!showProductPicker || !companyId) return
+    setPickerLoading(true)
+    productsApi
+      .list(companyId, {
+        price_list_id: selectedPriceListId || undefined,
+        search: pickerSearch.trim() || undefined,
+        product_group_id: pickerGroupFilter !== 'all' ? pickerGroupFilter : undefined,
+        page: pickerPage,
+        limit: 30,
+        is_active: true,
+        is_sellable: true,
+      })
+      .then((res) => {
+        if (res && Array.isArray(res.items)) {
+          setPickerProducts(res.items)
+          setPickerTotal(res.total || 0)
+          setPickerTotalPages(res.total_pages || 1)
+        } else if (Array.isArray(res)) {
+          setPickerProducts(res)
+          setPickerTotal(res.length)
+          setPickerTotalPages(1)
         }
-      }
-      results.push(p)
-      if (results.length >= 80) break
-    }
-    return results
-  }, [products, pickerSearch, pickerGroupFilter])
+      })
+      .catch((err) => {
+        console.error('Failed to load picker products:', err)
+        setPickerProducts([])
+      })
+      .finally(() => setPickerLoading(false))
+  }, [showProductPicker, companyId, selectedPriceListId, pickerSearch, pickerGroupFilter, pickerPage])
 
   function openProductPicker(lineIndex = -1) {
     if (!selectedPriceListId) return
@@ -514,6 +529,8 @@ export default function QuotesDetails() {
     setPickerGroupFilter('all')
     setSelectedProduct(null)
     setPickerSelectedIds([])
+    setPickerSelectedMap({})
+    setPickerPage(1)
     setShowProductPicker(true)
   }
 
@@ -521,7 +538,7 @@ export default function QuotesDetails() {
     const prod = p || selectedProduct
     if (!prod) return
 
-    const unitPrice = priceMap[prod.id] != null ? Number(priceMap[prod.id]) : 0
+    const unitPrice = prod.unit_price != null ? Number(prod.unit_price) : (priceMap[prod.id] != null ? Number(priceMap[prod.id]) : 0)
     const lines = [...form.lines]
 
     const newLineData = {
@@ -556,14 +573,14 @@ export default function QuotesDetails() {
   }
 
   function confirmBatchSelectProducts() {
-    const prodsToAdd = products.filter((p) => pickerSelectedIds.includes(p.id))
+    const prodsToAdd = Object.values(pickerSelectedMap)
     if (prodsToAdd.length === 0) return
 
     let lines = [...form.lines]
     let replaceFirst = lines.length === 1 && !lines[0].description.trim() && !lines[0].product_id
 
     prodsToAdd.forEach((prod, idx) => {
-      const unitPrice = priceMap[prod.id] != null ? Number(priceMap[prod.id]) : 0
+      const unitPrice = prod.unit_price != null ? Number(prod.unit_price) : (priceMap[prod.id] != null ? Number(priceMap[prod.id]) : 0)
       const newLine = {
         ...EMPTY_LINE,
         product_id: prod.id,
@@ -582,6 +599,7 @@ export default function QuotesDetails() {
     setForm({ ...form, lines })
     setShowProductPicker(false)
     setPickerSelectedIds([])
+    setPickerSelectedMap({})
   }
 
   const selectedFormAccount = useMemo(() => {
@@ -1651,7 +1669,7 @@ export default function QuotesDetails() {
                       Add Products to Quote
                     </h3>
                     <span className="tiny mut">
-                      Search &amp; select from {products.length} products with pricing from{' '}
+                      Search &amp; select from {pickerTotal} products with pricing from{' '}
                       <b>{selectedPriceList?.name}</b> ({selectedPriceList?.currency})
                     </span>
                   </div>
@@ -1677,11 +1695,17 @@ export default function QuotesDetails() {
                     className="settings-search-input"
                     placeholder="Search by SKU, product name, specs..."
                     value={pickerSearch}
-                    onChange={(e) => setPickerSearch(e.target.value)}
+                    onChange={(e) => {
+                      setPickerSearch(e.target.value)
+                      setPickerPage(1)
+                    }}
                     autoFocus
                   />
                   {pickerSearch && (
-                    <span style={{ cursor: 'pointer', color: 'var(--mut)', fontSize: 13 }} onClick={() => setPickerSearch('')}>
+                    <span style={{ cursor: 'pointer', color: 'var(--mut)', fontSize: 13 }} onClick={() => {
+                      setPickerSearch('')
+                      setPickerPage(1)
+                    }}>
                       ✕
                     </span>
                   )}
@@ -1695,14 +1719,17 @@ export default function QuotesDetails() {
                         ...groups.map((g) => ({ value: g.id, label: g.name })),
                       ]}
                       value={pickerGroupFilter}
-                      onChange={(val) => setPickerGroupFilter(val)}
+                      onChange={(val) => {
+                        setPickerGroupFilter(val)
+                        setPickerPage(1)
+                      }}
                       className="settings-custom-select"
                     />
                   </div>
                 )}
 
                 <span className="tiny mut" style={{ marginLeft: 'auto' }}>
-                  Showing {filteredPickerProducts.length} results
+                  {pickerLoading ? 'Searching...' : `Showing ${pickerProducts.length} of ${pickerTotal} results`}
                 </span>
               </div>
 
@@ -1715,19 +1742,26 @@ export default function QuotesDetails() {
                         <input
                           type="checkbox"
                           checked={
-                            filteredPickerProducts.length > 0 &&
-                            filteredPickerProducts.every((p) => pickerSelectedIds.includes(p.id))
+                            pickerProducts.length > 0 &&
+                            pickerProducts.every((p) => pickerSelectedIds.includes(p.id))
                           }
                           onChange={(e) => {
                             if (e.target.checked) {
-                              const ids = Array.from(new Set([...pickerSelectedIds, ...filteredPickerProducts.map((p) => p.id)]))
-                              setPickerSelectedIds(ids)
+                              const newIds = Array.from(new Set([...pickerSelectedIds, ...pickerProducts.map((p) => p.id)]))
+                              const newMap = { ...pickerSelectedMap }
+                              pickerProducts.forEach((p) => { newMap[p.id] = p })
+                              setPickerSelectedIds(newIds)
+                              setPickerSelectedMap(newMap)
                             } else {
-                              const visibleIds = new Set(filteredPickerProducts.map((p) => p.id))
-                              setPickerSelectedIds(pickerSelectedIds.filter((id) => !visibleIds.has(id)))
+                              const pageIds = new Set(pickerProducts.map((p) => p.id))
+                              const newIds = pickerSelectedIds.filter((id) => !pageIds.has(id))
+                              const newMap = { ...pickerSelectedMap }
+                              pageIds.forEach((id) => delete newMap[id])
+                              setPickerSelectedIds(newIds)
+                              setPickerSelectedMap(newMap)
                             }
                           }}
-                          title="Select all visible products"
+                          title="Select all on this page"
                           style={{ cursor: 'pointer' }}
                         />
                       </th>
@@ -1739,17 +1773,23 @@ export default function QuotesDetails() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPickerProducts.length === 0 ? (
+                    {pickerLoading ? (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--mut)' }}>
+                          Loading products...
+                        </td>
+                      </tr>
+                    ) : pickerProducts.length === 0 ? (
                       <tr>
                         <td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--mut)' }}>
                           No products matching your search/filters.
                         </td>
                       </tr>
                     ) : (
-                      filteredPickerProducts.map((p) => {
+                      pickerProducts.map((p) => {
                         const isChecked = pickerSelectedIds.includes(p.id)
                         const isRadio = selectedProduct?.id === p.id
-                        const plPrice = priceMap[p.id]
+                        const plPrice = p.unit_price != null ? p.unit_price : priceMap[p.id]
 
                         return (
                           <tr
@@ -1759,8 +1799,14 @@ export default function QuotesDetails() {
                               setSelectedProduct(p)
                               if (pickerSelectedIds.includes(p.id)) {
                                 setPickerSelectedIds(pickerSelectedIds.filter((id) => id !== p.id))
+                                setPickerSelectedMap((prev) => {
+                                  const n = { ...prev }
+                                  delete n[p.id]
+                                  return n
+                                })
                               } else {
                                 setPickerSelectedIds([...pickerSelectedIds, p.id])
+                                setPickerSelectedMap((prev) => ({ ...prev, [p.id]: p }))
                               }
                             }}
                             onDoubleClick={() => confirmSelectProduct(p)}
@@ -1772,9 +1818,15 @@ export default function QuotesDetails() {
                                 onChange={(e) => {
                                   if (e.target.checked) {
                                     setPickerSelectedIds([...pickerSelectedIds, p.id])
+                                    setPickerSelectedMap((prev) => ({ ...prev, [p.id]: p }))
                                     setSelectedProduct(p)
                                   } else {
                                     setPickerSelectedIds(pickerSelectedIds.filter((id) => id !== p.id))
+                                    setPickerSelectedMap((prev) => {
+                                      const n = { ...prev }
+                                      delete n[p.id]
+                                      return n
+                                    })
                                   }
                                 }}
                                 style={{ cursor: 'pointer' }}
@@ -1829,6 +1881,35 @@ export default function QuotesDetails() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Controls */}
+              {pickerTotalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+                  <span className="tiny mut">
+                    Page {pickerPage} of {pickerTotalPages} ({pickerTotal} items)
+                  </span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      style={{ padding: '4px 10px', fontSize: 12, borderRadius: 14 }}
+                      disabled={pickerPage <= 1 || pickerLoading}
+                      onClick={() => setPickerPage((p) => Math.max(1, p - 1))}
+                    >
+                      ← Previous
+                    </button>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      style={{ padding: '4px 10px', fontSize: 12, borderRadius: 14 }}
+                      disabled={pickerPage >= pickerTotalPages || pickerLoading}
+                      onClick={() => setPickerPage((p) => Math.min(pickerTotalPages, p + 1))}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Bottom Actions */}
               <div className="price-picker-bottom-bar">

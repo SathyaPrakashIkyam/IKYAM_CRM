@@ -294,6 +294,11 @@ export default function Record() {
               <div>
                 <div style={{ font: '600 16px var(--d)' }}>{opp.name}</div>
                 <div className="tiny">{opp.opportunity_no} · <span className={`chip ${opp.status === 'won' ? 'ok' : opp.status === 'lost' ? 'risk' : 'brand'}`}>{opp.status}</span></div>
+                {opp.description && (
+                  <div className="tiny mut" style={{ marginTop: 6, maxWidth: 600, lineHeight: 1.45 }}>
+                    {opp.description}
+                  </div>
+                )}
                 {opp.status === 'lost' && opp.lost_reason && (
                   <div className="tiny mut" style={{ marginTop: 4, fontStyle: 'italic' }}>Reason: {opp.lost_reason}</div>
                 )}
